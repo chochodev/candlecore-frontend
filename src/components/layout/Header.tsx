@@ -3,7 +3,7 @@ import { Logo } from "../Logo";
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-800/50 bg-gray-950/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 w-full border-b border-gray-800/50 bg-gray-900/80 backdrop-blur-xl">
       <div className="container mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 md:px-6">
         {/* Logo & Brand */}
         <Link to="/" className="group flex items-center gap-2.5">

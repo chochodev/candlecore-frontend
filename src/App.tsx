@@ -1,22 +1,22 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { Header } from "./components/layout/Header";
-import { Home } from "./pages/Home";
-import { NotFound } from "./pages/NotFound";
-import { Dashboard } from "./pages/Dashboard";
+import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { Header } from "./components/layout/Header"
+import { Home } from "./pages/Home"
+import { Dashboard } from "./pages/Dashboard"
+import { NotFound } from "./pages/NotFound"
 
 function App() {
   return (
-    <BrowserRouter>
-      <div className="dark min-h-screen bg-gray-950">
+    <div className="min-h-screen bg-gray-950">
+      <BrowserRouter>
         <Header />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </div>
-    </BrowserRouter>
-  );
+      </BrowserRouter>
+    </div>
+  )
 }
 
-export default App;
+export default App
