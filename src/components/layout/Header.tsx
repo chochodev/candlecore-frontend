@@ -7,9 +7,9 @@ export function Header() {
       <div className="container mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 md:px-6">
         {/* Logo & Brand */}
         <Link to="/" className="group flex items-center gap-2.5">
-          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 transition-transform duration-200 group-hover:scale-110">
+          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-linear-to-br from-emerald-500 to-emerald-600 transition-transform duration-200 group-hover:scale-110">
             <Logo className="h-5 w-5 text-white" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+            <div className="absolute inset-0 bg-linear-to-t from-black/20 to-transparent"></div>
           </div>
           <div className="flex flex-col">
             <span className="font-gellix text-base leading-none font-bold text-white md:text-lg">Candlecore</span>
@@ -19,6 +19,12 @@ export function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden items-center gap-1 md:flex">
+          <Link
+            to="/dashboard"
+            className="rounded-full px-4 py-2 text-sm font-medium text-gray-400 transition-all hover:bg-gray-800/50 hover:text-white"
+          >
+            Dashboard
+          </Link>
           <Link
             to="/docs"
             className="rounded-full px-4 py-2 text-sm font-medium text-gray-400 transition-all hover:bg-gray-800/50 hover:text-white"

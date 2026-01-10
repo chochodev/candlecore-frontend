@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Header } from "./components/layout/Header";
 import { Home } from "./pages/Home";
 import { NotFound } from "./pages/NotFound";
+import { Dashboard } from "./pages/Dashboard";
 
 function App() {
   return (
@@ -10,6 +11,7 @@ function App() {
         <Header />
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

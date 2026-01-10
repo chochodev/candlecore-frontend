@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 
 export function Home() {
@@ -37,11 +38,11 @@ export function Home() {
               </p>
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row">
-                <a
-                  href="#features"
+                <Link
+                  to="/dashboard"
                   className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 text-base font-semibold text-white shadow-md shadow-emerald-500/10 transition-all hover:bg-emerald-600 hover:shadow-lg hover:shadow-emerald-500/15"
                 >
-                  Get Started
+                  Open Dashboard
                   <svg
                     className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
                     fill="none"
@@ -50,7 +51,7 @@ export function Home() {
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
-                </a>
+                </Link>
                 <a
                   href="http://localhost:8080/api/v1/health"
                   target="_blank"
