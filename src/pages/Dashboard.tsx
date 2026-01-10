@@ -30,7 +30,7 @@ export function Dashboard() {
   const [configOpen, setConfigOpen] = useState(false)
   const [config, setConfig] = useState<BotConfig>({
     symbol: "bitcoin",
-    timeframe: "5m",
+    timeframe: "1h",
     strategy: "ma_crossover",
     replay_mode: true,
   })
