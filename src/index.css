@@ -1,0 +1,140 @@
+@import "tailwindcss";
+/* @import "tw-animate-css"; */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Thin (100) */
+@font-face {
+  font-family: "Gellix";
+  src: url("/assets/fonts/Gellix-TRIAL-Thin.otf") format("opentype");
+  font-weight: 100;
+  font-style: normal;
+  /* font-display: swap; */
+}
+
+/* Light (300) */
+@font-face {
+  font-family: "Gellix";
+  src: url("/assets/fonts/Gellix-TRIAL-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  /* font-display: swap; */
+}
+
+/* Regular (400) */
+@font-face {
+  font-family: "Gellix";
+  src: url("/assets/fonts/Gellix-TRIAL-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  /* font-display: swap; */
+}
+
+/* Medium (500) */
+@font-face {
+  font-family: "Gellix";
+  src: url("/assets/fonts/Gellix-TRIAL-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  /* font-display: swap; */
+}
+
+/* SemiBold (600) */
+@font-face {
+  font-family: "Gellix";
+  src: url("/assets/fonts/Gellix-TRIAL-SemiBold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  /* font-display: swap; */
+}
+
+/* Bold (700) */
+@font-face {
+  font-family: "Gellix";
+  src: url("/assets/fonts/Gellix-TRIAL-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  /* font-display: swap; */
+}
+
+/* ExtraBold (800) */
+@font-face {
+  font-family: "Gellix";
+  src: url("/assets/fonts/Gellix-TRIAL-ExtraBold.otf") format("opentype");
+  font-weight: 800;
+  font-style: normal;
+  /* font-display: swap; */
+}
+
+/* Black (900) */
+@font-face {
+  font-family: "Gellix";
+  src: url("/assets/fonts/Gellix-TRIAL-Black.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  /* font-display: swap; */
+}
+
+@theme {
+  /* Screens */
+  --breakpoint-xs: 480px;
+
+  /* Text */
+  --text-xxs: 0.625rem;
+  --text-xs: 0.75rem;
+
+  /* Color */
+  --color-background: #f9fafb;
+  --color-background-dark: #0a0a0a;
+
+  /* Fonts */
+  --font-gellix: "Gellix", "Inter", sans-serif, ui-sans-serif, system-ui;
+  --font-inter: "Inter", sans-serif;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #cccccc;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #444444;
+  border: 2px solid #cccccc;
+  border-radius: 5px;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-gellix);
+  color: white;
+}
+
+/* Focus styles for accessibility */
+*:focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
+/* Selection color */
+::selection {
+  background-color: #10b981;
+  color: #ffffff;
+}
+
+::-moz-selection {
+  background-color: #10b981;
+  color: #ffffff;
+}
