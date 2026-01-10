@@ -39,7 +39,7 @@ export function Home() {
               <div className="flex flex-col gap-3 pt-2 sm:flex-row">
                 <a
                   href="#features"
-                  className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-600 hover:shadow-xl hover:shadow-emerald-500/30"
+                  className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 text-base font-semibold text-white shadow-md shadow-emerald-500/10 transition-all hover:bg-emerald-600 hover:shadow-lg hover:shadow-emerald-500/15"
                 >
                   Get Started
                   <svg
@@ -326,7 +326,7 @@ export function Home() {
               href="https://github.com/chochodev/candlecore"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-emerald-500 px-8 text-base font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-600 hover:shadow-xl hover:shadow-emerald-500/30"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-emerald-500 px-8 text-base font-semibold text-white shadow-md shadow-emerald-500/10 transition-all hover:bg-emerald-600 hover:shadow-lg hover:shadow-emerald-500/15"
             >
               View on GitHub
             </a>
