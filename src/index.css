@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 @plugin "tailwindcss-animate";
-@import "tw-animate-css";
 /* @import "tw-animate-css"; */
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -116,13 +115,15 @@
 }
 
 /* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: #0c0c0e;
+  color: white;
 }
 
-body {
-  font-family: var(--font-gellix);
-  color: white;
+a, button, select {
+  cursor: pointer;
 }
 
 /* Focus styles for accessibility */

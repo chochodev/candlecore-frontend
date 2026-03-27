@@ -15,6 +15,7 @@ export interface CandleData {
   low: number;
   close: number;
   volume: number;
+  indicators?: Record<string, number>; // Added for visualization
 }
 
 export interface Decision {
@@ -31,7 +32,7 @@ export interface Decision {
 export interface Position {
   id: string;
   symbol: string;
-  side: 'long' | 'short';
+  side: 'buy' | 'sell';
   entry_price: number;
   quantity: number;
   current_price: number;
@@ -45,4 +46,5 @@ export interface PnLData {
   balance: number;
   total_pnl: number;
   unrealized_pnl?: number;
+  win_rate: number;
 }

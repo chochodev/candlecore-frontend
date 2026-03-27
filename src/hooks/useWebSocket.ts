@@ -46,9 +46,19 @@ export function useWebSocket(): UseWebSocketReturn {
           switch (wsEvent.type) {
             case 'candle':
               setCandles(prev => {
+                // Check if candle already exists (prevent duplicates)
+                const candleExists = prev.some(c =>
+                  c.timestamp === wsEvent.data.timestamp &&
+                  c.close === wsEvent.data.close
+                );
+
+                if (candleExists) {
+                  return prev; // Don't add duplicate
+                }
+
                 const newCandles = [...prev, wsEvent.data];
-                // Keep last 500 candles for performance
-                return newCandles.slice(-500);
+                // Keep last 100 candles max (for performance and clean display)
+                return newCandles.slice(-100);
               });
               break;
 
@@ -69,6 +79,12 @@ export function useWebSocket(): UseWebSocketReturn {
 
             case 'status':
               setStatus(wsEvent.data.status);
+              // Clear candles when bot starts fresh
+              if (wsEvent.data.status === 'started') {
+                setCandles([]);
+                setDecisions([]);
+                setPosition(null);
+              }
               break;
           }
         } catch (error) {

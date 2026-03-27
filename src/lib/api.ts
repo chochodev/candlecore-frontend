@@ -5,6 +5,8 @@ export interface BotConfig {
   timeframe: string;
   strategy: string;
   replay_mode: boolean;
+  dry_run?: boolean;
+  replay_speed?: number;
 }
 
 export interface BotStatus {
@@ -13,6 +15,9 @@ export interface BotStatus {
   timeframe: string;
   strategy: string;
   replay_mode: boolean;
+  dry_run?: boolean; // Dry-run mode indicator
+  wallet_balance?: number; // Virtual balance in dry-run
+  wallet_pnl?: number; // Virtual PnL in dry-run
   balance?: number;
   total_pnl?: number;
   position?: any;
@@ -41,6 +46,10 @@ export const botAPI = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
     });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to configure bot');
+    }
     return res.json();
   },
 
