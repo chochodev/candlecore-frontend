@@ -67,4 +67,10 @@ export const botAPI = {
     const res = await fetch(`${API_BASE}/timeframes`);
     return res.json();
   },
+
+  async getReports(): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/strategies/reports`);
+    if (!res.ok) throw new Error('Failed to fetch strategy reports');
+    return res.json();
+  },
 };

@@ -2,7 +2,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Header } from "./components/layout/Header";
 import { Home } from "./pages/Home";
 import { Dashboard } from "./pages/Dashboard";
-import { StrategyLab } from "./pages/StrategyLab";
+import LabIndex from "./pages/lab/Index";
+import LabCompare from "./pages/lab/Compare";
 import { APIStatus } from "./pages/APIStatus";
 import { NotFound } from "./pages/NotFound";
 
@@ -13,7 +14,10 @@ function App() {
         <Routes>
           <Route element={<Header />}>
             <Route path="/" element={<Home />} />
-            <Route path="/lab" element={<StrategyLab />} />
+            <Route path="/lab">
+              <Route index element={<LabIndex />} />
+              <Route path="compare" element={<LabCompare />} />
+            </Route>
             <Route path="/api" element={<APIStatus />} />
             <Route path="*" element={<NotFound />} />
           </Route>
