@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 export function Home() {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gray-950">
+    <div className="relative min-h-screen overflow-hidden bg-dark-core">
       {/* Animated background stars */}
       <div className="absolute inset-0 -z-10">
         {[...Array(50)].map((_, i) => (

@@ -1,4 +1,4 @@
-export type WSEventType = 'candle' | 'decision' | 'position' | 'pnl' | 'status';
+export type WSEventType = 'candle' | 'decision' | 'position' | 'pnl' | 'status' | 'history';
 
 export interface WSEvent {
   type: WSEventType;

@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import type { WSEventType, WSEvent, CandleData, Decision, Position, PnLData } from '@/types/trading';
+import type { WSEvent, CandleData, Decision, Position, PnLData } from '@/types/trading';
 
 interface UseWebSocketReturn {
   candles: CandleData[];
+  setCandles: React.Dispatch<React.SetStateAction<CandleData[]>>;
   decisions: Decision[];
+  setDecisions: React.Dispatch<React.SetStateAction<Decision[]>>;
   position: Position | null;
   pnl: PnLData | null;
+  setPnl: React.Dispatch<React.SetStateAction<PnLData | null>>;
   status: string;
   isConnected: boolean;
   connect: () => void;
@@ -42,53 +45,57 @@ export function useWebSocket(): UseWebSocketReturn {
       ws.onmessage = (event) => {
         try {
           const wsEvent: WSEvent = JSON.parse(event.data);
+          console.debug(`[WS] Incoming Event: ${wsEvent.type}`, wsEvent.data);
 
           switch (wsEvent.type) {
             case 'candle':
-              setCandles(prev => {
-                // Check if candle already exists (prevent duplicates)
+              setCandles((prev) => {
                 const candleExists = prev.some(c =>
                   c.timestamp === wsEvent.data.timestamp &&
                   c.close === wsEvent.data.close
                 );
-
-                if (candleExists) {
-                  return prev; // Don't add duplicate
-                }
-
+                if (candleExists) return prev;
+                
                 const newCandles = [...prev, wsEvent.data];
-                // Keep last 100 candles max (for performance and clean display)
-                return newCandles.slice(-100);
+                return newCandles.sort((a, b) => 
+                  new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+                ).slice(-1000);
               });
               break;
 
             case 'decision':
-              setDecisions(prev => {
-                const newDecisions = [...prev, wsEvent.data];
-                return newDecisions.slice(-50); // Keep last 50 decisions
-              });
+              console.info("🎯 NEURAL SIGNAL DETECTED:", wsEvent.data);
+              setDecisions((prev) => [...prev, wsEvent.data]);
               break;
 
             case 'position':
+              console.info("📊 POSITION UPDATE:", wsEvent.data);
               setPosition(wsEvent.data);
               break;
 
             case 'pnl':
+              console.info("💰 PNL UPDATE:", wsEvent.data);
               setPnl(wsEvent.data);
               break;
 
+            case 'history':
+              console.info(`🛰️ NEURAL WARP COMPLETE: Batch size: ${wsEvent.data.length} candles`);
+              setCandles(wsEvent.data);
+              break;
+
             case 'status':
+              console.info(`📟 ENGINE STATUS: ${wsEvent.data.status}`);
               setStatus(wsEvent.data.status);
-              // Clear candles when bot starts fresh
-              if (wsEvent.data.status === 'started') {
-                setCandles([]);
-                setDecisions([]);
-                setPosition(null);
+              if (wsEvent.data.status === 'started' || wsEvent.data.status === 'reset') {
+                 setCandles([]);
+                 setDecisions([]);
+                 setPnl(null);
+                 setPosition(null);
               }
               break;
           }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+        } catch (e) {
+          console.error('[WS] Neural Stream Parse Error:', e);
         }
       };
 
@@ -138,9 +145,12 @@ export function useWebSocket(): UseWebSocketReturn {
 
   return {
     candles,
+    setCandles,
     decisions,
+    setDecisions,
     position,
     pnl,
+    setPnl,
     status,
     isConnected,
     connect,

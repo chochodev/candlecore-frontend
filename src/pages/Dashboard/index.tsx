@@ -19,13 +19,13 @@ import { Logo } from "@/components/Logo";
 import "./dashboard.css";
 
 export function Dashboard() {
-  const { candles, decisions, position, pnl, isConnected, connect } = useWebSocket();
+  const { candles, setCandles, decisions, setDecisions, position, pnl, setPnl, isConnected, status, connect } = useWebSocket();
   const [botStatus, setBotStatus] = useState<any>(null);
   const [symbols, setSymbols] = useState<string[]>([]);
   const [timeframes, setTimeframes] = useState<string[]>([]);
   const [configOpen, setConfigOpen] = useState(false);
   const [config, setConfig] = useState<BotConfig>({
-    symbol: "btc",
+    symbol: "sol",
     timeframe: "1h",
     strategy: "ma_crossover",
     replay_mode: true,
@@ -39,7 +39,6 @@ export function Dashboard() {
   const [configError, setConfigError] = useState<string | null>(null);
 
   const onMouseDown = (e: React.MouseEvent) => {
-    // Only allow dragging from the top area or the button background
     if (!(e.target as HTMLElement).closest(".drag-handle")) return;
 
     setIsDragging(true);
@@ -70,7 +69,6 @@ export function Dashboard() {
     };
   }, [isDragging, dragOffset]);
 
-  // Stats from PNL
   const pnlStats = {
     pnl: pnl?.total_pnl || 0,
     winRate: pnl?.win_rate || 0,
@@ -83,7 +81,6 @@ export function Dashboard() {
       await loadMetadata();
       const status = await loadBotStatus();
 
-      // Only auto-configure if NO bot is currently active
       if (!status?.running) {
         await handleConfigure();
       }
@@ -100,7 +97,7 @@ export function Dashboard() {
   const loadMetadata = async () => {
     try {
       const [symbolsRes, timeframesRes] = await Promise.all([botAPI.getSymbols(), botAPI.getTimeframes()]);
-      setSymbols(symbolsRes.symbols);
+      setSymbols(["sol", "btc"]);
       setTimeframes(timeframesRes.timeframes);
     } catch (error) {
       console.error("Failed to load metadata:", error);
@@ -136,6 +133,18 @@ export function Dashboard() {
     }
   };
 
+  const handleReset = async () => {
+    try {
+      await botAPI.reset();
+      setCandles([]);
+      setDecisions([]);
+      setPnl({ total_pnl: 0, win_rate: 0, balance: 10000 });
+      await loadBotStatus();
+    } catch (error) {
+      console.error("Failed to reset bot:", error);
+    }
+  };
+
   const handleConfigure = async () => {
     setConfigError(null);
     try {
@@ -149,12 +158,10 @@ export function Dashboard() {
   };
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0c0c0e] font-sans selection:bg-emerald-500/30">
-      {/* 🟢 TOP NAVIGATION TERMINAL BAR */}
-      <header className="z-50 shrink-0 border-b border-white/5 bg-[#0c0c0e] backdrop-blur-xl">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-dark-core font-sans selection:bg-emerald-500/30">
+      <header className="z-50 shrink-0 border-b border-white/5 bg-dark-core backdrop-blur-xl">
         <div className="flex h-full items-center justify-between px-6 py-4">
           <div className="flex items-center gap-8">
-            {/* Official Logo (Only Icon for Max Space) */}
             <Link
               to="/"
               className="group relative flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-linear-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/20 transition-all hover:scale-110 active:scale-95"
@@ -162,12 +169,11 @@ export function Dashboard() {
               <Logo className="h-5 w-5 text-white" />
             </Link>
 
-            {/* Menu Links Layer */}
             <nav className="hidden items-center gap-2 rounded-lg bg-white/5 p-1 md:flex">
               <Link to="/dashboard">
                 <Button
                   variant="ghost"
-                  className="h-7 px-3 text-[11px] font-bold text-white transition-all hover:bg-white/10"
+                  className="h-7 px-3 text-[11px] font-bold text-white transition-all hover:bg-white/10 hover:text-white"
                 >
                   Dashboard
                 </Button>
@@ -192,10 +198,9 @@ export function Dashboard() {
 
             <div className="h-4 w-px bg-white/10" />
 
-            {/* Market Context */}
             <div className="flex items-center gap-2.5">
               <div className="flex flex-col">
-                <span className="text-[10px] font-black tracking-widest text-gray-600 uppercase">Trading Pair</span>
+                <span className="text-[10px] font-semibold tracking-widest text-gray-600 uppercase">Trading Pair</span>
                 <span className="text-xs font-bold text-white">
                   {config.symbol.toUpperCase()} / {config.timeframe}
                 </span>
@@ -208,7 +213,7 @@ export function Dashboard() {
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-bold tracking-widest text-gray-600 uppercase">Total PnL</span>
               <span
-                className={`font-mono text-sm font-black tracking-tighter ${pnlStats.pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
+                className={`font-mono text-sm font-semibold tracking-tighter ${pnlStats.pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
               >
                 {pnlStats.pnl >= 0 ? "+" : ""}${pnlStats.pnl.toFixed(2)}
               </span>
@@ -217,7 +222,7 @@ export function Dashboard() {
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-bold tracking-widest text-gray-600 uppercase">Accuracy</span>
               <span
-                className={`font-mono text-sm font-black tracking-tighter ${pnlStats.winRate >= 50 ? "text-emerald-400" : "text-orange-400"}`}
+                className={`font-mono text-sm font-semibold tracking-tighter ${pnlStats.winRate >= 50 ? "text-emerald-400" : "text-orange-400"}`}
               >
                 {pnlStats.winRate.toFixed(1)}%
               </span>
@@ -225,7 +230,7 @@ export function Dashboard() {
 
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-bold tracking-widest text-gray-600 uppercase">Wallet</span>
-              <span className="font-mono text-sm font-black tracking-tighter text-white">
+              <span className="font-mono text-sm font-semibold tracking-tighter text-white">
                 ${pnlStats.balance.toFixed(2)}
               </span>
             </div>
@@ -252,9 +257,9 @@ export function Dashboard() {
                     </svg>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="overflow-hidden border-white/5 bg-[#0c0c0e] text-white shadow-2xl">
+                <DialogContent className="overflow-hidden border-white/5 bg-dark-core text-white shadow-2xl">
                   <DialogHeader className="border-b border-white/5 pb-4">
-                    <DialogTitle className="text-xl font-black">Engine Config</DialogTitle>
+                    <DialogTitle className="text-xl font-semibold">Engine Config</DialogTitle>
                     <DialogDescription className="text-gray-500">
                       Fine-tune the bot's neural parameters.
                     </DialogDescription>
@@ -262,12 +267,12 @@ export function Dashboard() {
                   <div className="space-y-6 py-6 font-sans">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-black text-gray-500 uppercase">Asset</Label>
+                        <Label className="text-[10px] font-semibold text-gray-500 uppercase">Asset</Label>
                         <Select value={config.symbol} onValueChange={(v) => setConfig({ ...config, symbol: v })}>
                           <SelectTrigger className="border-white/5 bg-white/5 font-bold uppercase">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent className="border-white/5 bg-[#0c0c0e] text-white">
+                          <SelectContent className="border-white/5 bg-dark-core text-white">
                             {symbols.map((s) => (
                               <SelectItem key={s} value={s} className="font-bold uppercase">
                                 {s}
@@ -277,12 +282,14 @@ export function Dashboard() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-black text-gray-500 uppercase">Interval</Label>
+                        <Label className="text-[10px] leading-none font-semibold tracking-widest text-gray-500 uppercase">
+                          Interval
+                        </Label>
                         <Select value={config.timeframe} onValueChange={(v) => setConfig({ ...config, timeframe: v })}>
-                          <SelectTrigger className="border-white/5 bg-white/5 font-bold">
+                          <SelectTrigger className="h-10 border-white/5 bg-white/5 font-bold">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent className="border-white/5 bg-[#0c0c0e] text-white">
+                          <SelectContent className="border-white/5 bg-dark-core text-white">
                             {timeframes.map((tf) => (
                               <SelectItem key={tf} value={tf} className="font-bold">
                                 {tf}
@@ -292,6 +299,42 @@ export function Dashboard() {
                         </Select>
                       </div>
                     </div>
+
+                    <div className="space-y-4">
+                      <Label className="mb-1 block text-[10px] leading-none font-semibold tracking-[0.2em] text-emerald-500 uppercase">
+                        Neural Parameters
+                      </Label>
+                      <div className="space-y-4 rounded-xl border border-white/5 bg-white/2 p-4">
+                        <div className="space-y-2">
+                          <div className="flex h-4 items-center justify-between">
+                            <Label className="text-[9px] leading-none font-bold text-gray-500 uppercase">
+                              Fee Shield Target
+                            </Label>
+                            <span className="text-[9px] leading-none font-semibold text-emerald-400">
+                              {((config.strategy_params?.tp1Pct ?? 0.001) * 100).toFixed(2)}%
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0.05"
+                            max="0.5"
+                            step="0.01"
+                            defaultValue={0.1}
+                            onChange={(e) =>
+                              setConfig({
+                                ...config,
+                                strategy_params: {
+                                  ...config.strategy_params,
+                                  tp1Pct: parseFloat(e.target.value) / 100,
+                                },
+                              })
+                            }
+                            className="h-1 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-emerald-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     {configError && (
                       <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3">
                         <p className="text-[10px] font-bold tracking-tight text-red-400 uppercase">
@@ -303,30 +346,56 @@ export function Dashboard() {
                     <Button
                       onClick={handleConfigure}
                       disabled={botStatus?.running}
-                      className="w-full bg-emerald-500 font-black shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600"
+                      className="w-full bg-emerald-500 font-semibold shadow-lg hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-600"
                     >
-                      {botStatus?.running ? "STOP ENGINE TO RECONFIGURE" : "FORCE CONFIG UPDATE"}
+                      {botStatus?.running ? "Stop Engine to Reconfigure" : "Force Config Update"}
                     </Button>
                   </div>
                 </DialogContent>
               </Dialog>
 
               {botStatus?.running ? (
-                <Button
-                  onClick={handleStop}
-                  size="sm"
-                  className="h-9 gap-2.5 border border-red-500/20 bg-red-500/10 px-5 text-[11px] font-black text-red-500 transition-all hover:bg-red-500/20"
-                >
-                  STOP BOT
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={async () => {
+                      try {
+                        await botAPI.skip();
+                      } catch (e) {
+                        console.error("Skip Failed:", e);
+                      }
+                    }}
+                    size="sm"
+                    className="group relative flex h-9 gap-2 overflow-hidden border border-blue-500/20 bg-blue-500/10 px-5 text-[11px] font-semibold text-blue-400 transition-all hover:bg-blue-500/20"
+                  >
+                    <span className="relative z-10">JUMP TO ACTION</span>
+                    <div className="absolute inset-0 z-0 bg-blue-500/5 group-hover:animate-pulse"></div>
+                  </Button>
+                  <Button
+                    onClick={handleStop}
+                    size="sm"
+                    className="h-9 gap-2.5 border border-red-500/20 bg-red-500/10 px-5 text-[11px] font-semibold text-red-500 transition-all hover:bg-red-500/20"
+                  >
+                    STOP
+                  </Button>
+                </div>
               ) : (
-                <Button
-                  onClick={handleStart}
-                  size="sm"
-                  className="h-9 gap-2 border border-emerald-500/20 bg-emerald-500 px-6 text-[11px] font-black text-white shadow-lg shadow-emerald-500/30 transition-all hover:bg-emerald-600 active:scale-95"
-                >
-                  START BOT
-                </Button>
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={handleStart}
+                    size="sm"
+                    className="h-9 gap-2 border border-emerald-500/20 bg-emerald-500 px-6 text-[11px] font-semibold text-white shadow-lg transition-all hover:bg-emerald-600 active:scale-95"
+                  >
+                    START
+                  </Button>
+                  <Button
+                    onClick={handleReset}
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-2 border-white/10 bg-white/5 px-6 text-[11px] font-semibold text-gray-400 hover:bg-white/10 hover:text-white"
+                  >
+                    RESET
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -336,8 +405,14 @@ export function Dashboard() {
       {/* 🧭 MAIN VIEWPORT AREA */}
       <main className="relative flex-1 overflow-hidden">
         {/* Full-bleed Immersive Chart */}
-        <div className="h-full w-full overflow-hidden bg-[#0c0c0e]">
-          <CandlestickChart candles={candles} decisions={decisions} />
+        <div className="h-full w-full overflow-hidden bg-dark-core">
+          <CandlestickChart 
+            candles={candles} 
+            decisions={decisions} 
+            activeSymbol={config.symbol} 
+            timeframe={config.timeframe}
+            isSearching={botStatus?.running && candles.length === 0}
+          />
         </div>
 
         {/* 🛸 FLOATING GLASS SIDEBAR (Movable) */}
@@ -382,7 +457,9 @@ export function Dashboard() {
                 {/* Active Risk Unit */}
                 <div className="mb-8 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-[10px] font-black tracking-widest text-emerald-500 uppercase">Live Exposure</h3>
+                    <h3 className="text-[10px] font-semibold tracking-widest text-emerald-500 uppercase">
+                      Live Exposure
+                    </h3>
                     <Badge
                       variant="outline"
                       className="h-5 border-white/10 bg-white/5 text-[9px] font-bold text-gray-400"
@@ -395,7 +472,7 @@ export function Dashboard() {
                       <div className="flex items-end justify-between">
                         <span className="text-[9px] font-bold text-gray-500 uppercase">Direction</span>
                         <span
-                          className={`text-xs font-black ${position.side === "buy" ? "text-emerald-400" : "text-red-400"}`}
+                          className={`text-xs font-semibold ${position.side === "buy" ? "text-emerald-400" : "text-red-400"}`}
                         >
                           {position.side.toUpperCase()}
                         </span>
@@ -408,9 +485,9 @@ export function Dashboard() {
                       </div>
                       <div className="pt-2">
                         <div className="mb-1.5 flex items-center justify-between">
-                          <span className="text-[9px] font-black text-gray-500 uppercase">Profit Tracker</span>
+                          <span className="text-[9px] font-semibold text-gray-500 uppercase">Profit Tracker</span>
                           <span
-                            className={`font-mono text-xs font-black ${position.unrealized_pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
+                            className={`font-mono text-xs font-semibold ${position.unrealized_pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
                           >
                             {position.unrealized_pnl >= 0 ? "+" : ""}
                             {position.unrealized_pnl.toFixed(4)}
@@ -426,14 +503,16 @@ export function Dashboard() {
                     </div>
                   ) : (
                     <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/2">
-                      <span className="text-[10px] font-black tracking-widest text-gray-600">NO ACTIVE EXPOSURE</span>
+                      <span className="text-[10px] font-semibold tracking-widest text-gray-600">
+                        NO ACTIVE EXPOSURE
+                      </span>
                     </div>
                   )}
                 </div>
 
                 {/* Tactical Pulse Unit */}
                 <div className="space-y-4">
-                  <h3 className="text-[10px] font-black tracking-widest text-blue-500 uppercase">Decision Stream</h3>
+                  <h3 className="text-[10px] font-semibold tracking-widest text-blue-500 uppercase">Decision Stream</h3>
                   {decisions.length > 0 ? (
                     <div className="space-y-4">
                       <div className="rounded-xl border border-white/5 bg-white/2 p-4">
@@ -442,7 +521,7 @@ export function Dashboard() {
                             Current Sentiment
                           </span>
                           <span
-                            className={`rounded px-2 py-0.5 text-[9px] font-black tracking-widest uppercase ${
+                            className={`rounded px-2 py-0.5 text-[9px] font-semibold tracking-widest uppercase ${
                               decisions[decisions.length - 1].signal === "buy"
                                 ? "bg-emerald-500/20 text-emerald-400"
                                 : decisions[decisions.length - 1].signal === "sell"
@@ -475,7 +554,7 @@ export function Dashboard() {
                                   {new Date(d.timestamp).toLocaleTimeString()}
                                 </span>
                               </div>
-                              <span className="text-[10px] font-black tracking-tighter text-white uppercase">
+                              <span className="text-[10px] font-semibold tracking-tighter text-white uppercase">
                                 {d.signal}
                               </span>
                             </div>
@@ -484,7 +563,7 @@ export function Dashboard() {
                     </div>
                   ) : (
                     <div className="flex h-20 items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/2">
-                      <span className="text-[10px] font-black tracking-widest text-gray-600">LISTENING...</span>
+                      <span className="text-[10px] font-semibold tracking-widest text-gray-600">LISTENING...</span>
                     </div>
                   )}
                 </div>
@@ -492,6 +571,38 @@ export function Dashboard() {
             )}
           </div>
         </div>
+
+        {/* 🚀 NEURAL WARP OVERLAY */}
+        {status === "skipping" && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md transition-all animate-in fade-in zoom-in-95">
+            <div className="relative max-w-sm rounded-[2.5rem] border border-white/5 bg-linear-to-b from-white/5 to-transparent p-12 text-center shadow-2xl">
+               {/* Glowing Background Glow */}
+               <div className="absolute -top-10 -left-10 h-32 w-32 bg-emerald-500/10 blur-3xl opacity-50 rounded-full" />
+               <div className="absolute -bottom-10 -right-10 h-16 w-32 bg-blue-500/10 blur-3xl opacity-50 rounded-full" />
+
+              <div className="relative z-10">
+                <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-500/10 shadow-[0_0_60px_-10px_rgba(16,185,129,0.4)]">
+                  <svg className="h-10 w-10 animate-spin text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+                
+                <h3 className="mb-2 text-2xl font-bold tracking-tight text-white transition-all hover:text-emerald-400">Neural Warp Search</h3>
+                <p className="mb-10 text-[10px] font-bold tracking-[.3em] text-gray-500 uppercase">Finding Next Technical Signal</p>
+                
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-5 py-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-bold text-emerald-400">Analysing 17,000+ Candles...</span>
+                </div>
+              </div>
+
+               {/* Decorative corner accents */}
+                <div className="absolute top-0 right-0 h-10 w-10 border-t border-r border-white/10 rounded-tr-[2.5rem]" />
+                <div className="absolute bottom-0 left-0 h-10 w-10 border-b border-l border-white/10 rounded-bl-[2.5rem]" />
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

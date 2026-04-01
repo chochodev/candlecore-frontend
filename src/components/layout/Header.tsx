@@ -8,7 +8,6 @@ const NAV_LINKS = [
   { to: "/lab", label: "Strategy Lab" },
   { to: "/docs", label: "Docs" },
   { to: "/api", label: "API" },
-  { href: "https://github.com/chochodev/candlecore", label: "GitHub" },
 ];
 
 function Navigation({ variant, onClose }: { variant: "desktop" | "mobile"; onClose?: () => void }) {
@@ -16,31 +15,15 @@ function Navigation({ variant, onClose }: { variant: "desktop" | "mobile"; onClo
   const navClass = isMobile ? "flex flex-col gap-2" : "hidden items-center gap-1 md:flex";
   const linkClass = isMobile
     ? "flex items-center justify-between rounded-xl bg-gray-900 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-gray-800"
-    : "rounded-full px-4 py-2 text-sm font-medium text-gray-400 transition-all hover:bg-gray-800/50 hover:text-white";
+    : "rounded-full px-4 py-2 text-xs font-medium uppercase text-gray-400 transition-all tracking-widest hover:bg-gray-800/20 hover:text-white";
 
   return (
     <nav className={navClass}>
-      {NAV_LINKS.map((link) => {
-        if (link.href) {
-          return (
-            <a
-              key={link.label}
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={linkClass}
-            >
-              {link.label}
-            </a>
-          );
-        }
-
-        return (
-          <Link key={link.to} to={link.to!} onClick={onClose} className={linkClass}>
-            {link.label}
-          </Link>
-        );
-      })}
+      {NAV_LINKS.map((link) => (
+        <Link key={link.to} to={link.to!} onClick={onClose} className={linkClass}>
+          {link.label}
+        </Link>
+      ))}
     </nav>
   );
 }
@@ -50,20 +33,16 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b border-gray-800/50 bg-gray-900/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 w-full border-b border-gray-800 bg-dark-core/80 backdrop-blur-xl">
         <div className="container mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 md:px-6">
           {/* Logo & Brand */}
-          <Link to="/" className="group flex items-center gap-2.5">
-            <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-linear-to-br from-emerald-500 to-emerald-600 transition-transform duration-200 group-hover:scale-110">
+          <Link to="/" className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500 shadow-lg shadow-emerald-500/20">
               <Logo className="h-5 w-5 text-white" />
-              <div className="absolute inset-0 bg-linear-to-t from-black/20 to-transparent"></div>
             </div>
-            <div className="flex flex-col">
-              <span className="font-gellix text-base leading-none font-bold text-white md:text-lg">
-                Candlecore
-              </span>
-              <span className="hidden text-[10px] text-gray-400 sm:block">Trading Engine</span>
-            </div>
+            <span className="text-xl font-semibold tracking-tighter">
+              CANDLECORE <span className="text-emerald-500">V1.3</span>
+            </span>
           </Link>
 
           {/* Desktop Navigation */}

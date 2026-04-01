@@ -7,6 +7,7 @@ export interface BotConfig {
   replay_mode: boolean;
   dry_run?: boolean;
   replay_speed?: number;
+  strategy_params?: Record<string, any>;
 }
 
 export interface BotStatus {
@@ -32,6 +33,16 @@ export const botAPI = {
 
   async stop() {
     const res = await fetch(`${API_BASE}/bot/stop`, { method: 'POST' });
+    return res.json();
+  },
+
+  async skip() {
+    const res = await fetch(`${API_BASE}/bot/skip`, { method: 'POST' });
+    return res.json();
+  },
+
+  async reset() {
+    const res = await fetch(`${API_BASE}/bot/reset`, { method: 'POST' });
     return res.json();
   },
 

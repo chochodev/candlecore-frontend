@@ -88,6 +88,7 @@
   /* Color */
   --color-background: #f9fafb;
   --color-background-dark: #0a0a0a;
+  --color-dark-core: #0c0c0e;
 
   /* Fonts */
   --font-gellix: "Gellix", "Inter", sans-serif, ui-sans-serif, system-ui;
