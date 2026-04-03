@@ -26,7 +26,8 @@ function TradeInfoPanel({ trade }: { trade: Trade | null }) {
         </span>
         <div className="flex items-center gap-6 text-[9px] font-black text-zinc-500 uppercase italic">
           <div className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500/50 shadow-[0_0_8px_rgba(16,185,129,0.3)]" /> Entry Vector
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500/50 shadow-[0_0_8px_rgba(16,185,129,0.3)]" /> Entry
+            Vector
           </div>
           <div className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-red-500/50 shadow-[0_0_8px_rgba(239,68,68,0.3)]" /> Target Exit
@@ -51,12 +52,12 @@ function TradeInfoPanel({ trade }: { trade: Trade | null }) {
 
   const badge =
     trade.result === "open" ? (
-      <div className="inline-flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/10 px-4 py-1.5 text-[10px] font-black tracking-tighter text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/10 px-4 py-1.5 text-[10px] font-black tracking-tighter text-blue-400">
         <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-400" />
         LIVE EXPOSURE
       </div>
     ) : trade.result === "profit" ? (
-      <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 text-[10px] font-black tracking-tighter text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 text-[10px] font-black tracking-tighter text-emerald-400">
         ▲ +{trade.pnlPct}% SUCCESS
       </div>
     ) : (
@@ -65,8 +66,16 @@ function TradeInfoPanel({ trade }: { trade: Trade | null }) {
       </div>
     );
 
+  const shieldStatus = trade.dynamicSlPrice ? (
+    <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-1">
+      <span className="text-[8px] leading-none font-black tracking-widest text-emerald-400 uppercase">
+        Fee Shield Active
+      </span>
+    </div>
+  ) : null;
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/5 bg-white/3 p-5 shadow-2xl transition-all animate-in slide-in-from-bottom-2">
+    <div className="flex flex-wrap items-center justify-between gap-4 p-4 transition-all animate-in slide-in-from-bottom-2">
       <div className="flex flex-wrap items-center gap-6 font-mono text-[10px]">
         <div className="flex flex-col">
           <span className="mb-1 text-[8px] font-black tracking-widest text-zinc-600 uppercase">Asset Direction</span>
@@ -94,6 +103,7 @@ function TradeInfoPanel({ trade }: { trade: Trade | null }) {
           </div>
         )}
       </div>
+      {shieldStatus}
       {badge}
     </div>
   );
@@ -128,45 +138,59 @@ export function CandlestickChart({
   activePosition,
 }: CandlestickChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef    = useRef<IChartApi | null>(null);
-  const seriesRef   = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const fastMaRef   = useRef<ISeriesApi<"Line"> | null>(null);
-  const slowMaRef   = useRef<ISeriesApi<"Line"> | null>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const fastMaRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const slowMaRef = useRef<ISeriesApi<"Line"> | null>(null);
   const priceLinesRef = useRef<IPriceLine[]>([]);
-  const hasFittedRef  = useRef(false);
-  const rafRef        = useRef<number>(0);
+  const hasFittedRef = useRef(false);
+  const rafRef = useRef<number>(0);
 
   const [selectedTradeId, setSelectedTradeId] = useState<string | number | null>(null);
-  const [markerPositions, setMarkerPositions]   = useState<MarkerPosition[]>([]);
+  const [markerPositions, setMarkerPositions] = useState<MarkerPosition[]>([]);
 
   // ── Build trades ────────────────────────────────────────────────────────────
   const trades = useMemo(() => {
     if (!candles.length) return [];
 
+    // Sort candles once for reliable binary-search-style fallback lookup
+    const sortedCandles = [...candles].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+
     const result: Trade[] = [];
     let current: Partial<Trade> | null = null;
 
     decisions.forEach((d, idx) => {
-      const entryTime = new Date(d.timestamp).getTime();
-      // ── stable Unix-seconds timestamp stored directly on the trade ──
-      const entryTimeSec = Math.floor(entryTime / 1000);
+      const entryTimeMs = new Date(d.timestamp).getTime();
 
-      let candleIdx = candles.findIndex((c) => new Date(c.timestamp).getTime() === entryTime);
-      if (candleIdx === -1) {
-        for (let i = candles.length - 1; i >= 0; i--) {
-          if (new Date(candles[i].timestamp).getTime() <= entryTime) {
-            candleIdx = i;
+      // ── entryTimeSec is derived ONLY from d.timestamp.
+      // ── It is NEVER re-derived from a candle. This is the stable X anchor.
+      const entryTimeSec = Math.floor(entryTimeMs / 1000);
+
+      // candleIdx is only needed for the legacy entryIdx field — it does NOT drive marker X
+      let sortedIdx = sortedCandles.findIndex((c) => new Date(c.timestamp).getTime() === entryTimeMs);
+      if (sortedIdx === -1) {
+        for (let i = sortedCandles.length - 1; i >= 0; i--) {
+          if (new Date(sortedCandles[i].timestamp).getTime() <= entryTimeMs) {
+            sortedIdx = i;
             break;
           }
         }
       }
-      if (candleIdx === -1) return;
+      if (sortedIdx === -1) return;
+
+      const candleIdx = candles.indexOf(sortedCandles[sortedIdx]);
 
       if (d.signal === "buy") {
+        const candle = sortedCandles[sortedIdx];
+        const anchorTime = Math.floor(new Date(candle.timestamp).getTime() / 1000);
+
         current = {
           id: `t-${idx}`,
           entryIdx: candleIdx,
-          entryTime: entryTimeSec, // ← stable anchor
+          entryTime: entryTimeSec,
+          visualAnchorTime: anchorTime, // Sync anchor to candle start
           dir: "buy",
           entryPrice: d.price,
           tpPrice: d.price * 1.015,
@@ -193,30 +217,46 @@ export function CandlestickChart({
       result.push(current as Trade);
     }
 
-    if (activePosition && !result.find((t) => t.id === "active")) {
-      const entryTime = new Date(activePosition.opened_at).getTime();
-      const entryTimeSec = Math.floor(entryTime / 1000); // ← stable anchor
-      let candleIdx = -1;
-      for (let i = candles.length - 1; i >= 0; i--) {
-        if (new Date(candles[i].timestamp).getTime() <= entryTime) {
-          candleIdx = i;
+    if (activePosition) {
+      const entryTimeMs = new Date(activePosition.opened_at).getTime();
+      const entryTimeSec = Math.floor(entryTimeMs / 1000);
+
+      let sortedIdx = -1;
+      for (let i = sortedCandles.length - 1; i >= 0; i--) {
+        if (new Date(sortedCandles[i].timestamp).getTime() <= entryTimeMs) {
+          sortedIdx = i;
           break;
         }
       }
 
-      if (candleIdx !== -1) {
+      if (sortedIdx !== -1) {
+        const candleIdx = candles.indexOf(sortedCandles[sortedIdx]);
+
+        // 🛡️ DEDUPLICATION: Hide signal if position exists at same bar
+        const signalIndex = result.findIndex(
+          (t) => t.entryIdx === candleIdx
+        );
+        if (signalIndex !== -1) {
+          result.splice(signalIndex, 1);
+        }
+
+        const candle = sortedCandles[sortedIdx];
+        const anchorTime = Math.floor(new Date(candle.timestamp).getTime() / 1000);
+
         result.push({
           id: "active",
           entryIdx: candleIdx,
-          entryTime: entryTimeSec, // ← stable anchor
-          dir: activePosition.side === "long" || activePosition.side === "buy" ? "buy" : "sell",
+          entryTime: entryTimeSec,
+          visualAnchorTime: anchorTime,
+          dir: activePosition.side === "long" || activePosition.side === "buy" || activePosition.side === "Buy" ? "buy" : "sell",
           entryPrice: activePosition.entry_price,
-          tpPrice: activePosition.entry_price * 1.015,
-          slPrice: activePosition.entry_price * 0.985,
+          tpPrice: activePosition.side === "long" || activePosition.side === "buy" ? activePosition.entry_price * 1.015 : activePosition.entry_price * 0.985,
+          slPrice: activePosition.side === "long" || activePosition.side === "buy" ? activePosition.entry_price * 0.985 : activePosition.entry_price * 1.015,
           exitIdx: null,
           result: "open",
           timestamp: activePosition.opened_at,
           reasoning: "Active Engine Exposure",
+          dynamicSlPrice: activePosition.trailing_sl,
         } as Trade);
       }
     }
@@ -225,11 +265,13 @@ export function CandlestickChart({
   }, [decisions, candles, activePosition]);
 
   const tradesRef = useRef<Trade[]>(trades);
-  useEffect(() => { tradesRef.current = trades; }, [trades]);
+  useEffect(() => {
+    tradesRef.current = trades;
+  }, [trades]);
 
   const activeTrade = useMemo(() => {
     if (selectedTradeId !== null) return trades.find((t) => t.id === selectedTradeId) ?? null;
-    if (activePosition)          return trades.find((t) => t.id === "active") ?? null;
+    if (activePosition) return trades.find((t) => t.id === "active") ?? null;
     return null;
   }, [trades, selectedTradeId, activePosition]);
 
@@ -286,7 +328,7 @@ export function CandlestickChart({
       crosshairMarkerVisible: false,
     });
 
-    chartRef.current  = chart;
+    chartRef.current = chart;
     seriesRef.current = candleSeries;
     fastMaRef.current = fastMaSeries;
     slowMaRef.current = slowMaSeries;
@@ -302,7 +344,7 @@ export function CandlestickChart({
       cancelAnimationFrame(rafRef.current);
       ro.disconnect();
       chart.remove();
-      chartRef.current  = null;
+      chartRef.current = null;
       seriesRef.current = null;
       fastMaRef.current = null;
       slowMaRef.current = null;
@@ -350,7 +392,9 @@ export function CandlestickChart({
   // ── Price lines ─────────────────────────────────────────────────────────────
   const applyPriceLines = useCallback((trade: Trade | null) => {
     priceLinesRef.current.forEach((l) => {
-      try { seriesRef.current?.removePriceLine(l); } catch (_) {}
+      try {
+        seriesRef.current?.removePriceLine(l);
+      } catch (_) {}
     });
     priceLinesRef.current = [];
 
@@ -358,41 +402,80 @@ export function CandlestickChart({
 
     const s = seriesRef.current;
     const lines: IPriceLine[] = [
-      s.createPriceLine({ price: trade.entryPrice, color: "#10b981", lineWidth: 2, lineStyle: LineStyle.Solid,  axisLabelVisible: true, title: "ENTRY"        }),
-      s.createPriceLine({ price: trade.tpPrice,    color: "#3b82f6", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "TARGET (TP)"  }),
-      s.createPriceLine({ price: trade.slPrice,    color: "#ef4444", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "NEURAL SL"    }),
+      s.createPriceLine({
+        price: trade.entryPrice,
+        color: "#10b981",
+        lineWidth: 1,
+        lineStyle: LineStyle.Solid,
+        axisLabelVisible: true,
+        title: "ENTRY",
+      }),
+      s.createPriceLine({
+        price: trade.tpPrice,
+        color: "#3b82f6",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: "TARGET (TP)",
+      }),
+      s.createPriceLine({
+        price: trade.slPrice,
+        color: "#ef4444",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: "NEURAL SL",
+      }),
     ];
 
+    if (trade.dynamicSlPrice) {
+      lines.push(
+        s.createPriceLine({
+          price: trade.dynamicSlPrice,
+          color: "#fbbf24",
+          lineWidth: 2,
+          lineStyle: LineStyle.Solid,
+          axisLabelVisible: true,
+          title: "PROFIT LOCK (SL)",
+        })
+      );
+    }
+
     if (trade.exitPrice !== undefined) {
-      lines.push(s.createPriceLine({
-        price: trade.exitPrice,
-        color: trade.result === "profit" ? "#10b981" : "#ef4444",
-        lineWidth: 1,
-        lineStyle: LineStyle.Dotted,
-        axisLabelVisible: true,
-        title: trade.result === "profit" ? `EXIT +${trade.pnlPct}%` : `EXIT ${trade.pnlPct}%`,
-      }));
+      lines.push(
+        s.createPriceLine({
+          price: trade.exitPrice,
+          color: trade.result === "profit" ? "#10b981" : "#ef4444",
+          lineWidth: 1,
+          lineStyle: LineStyle.Dotted,
+          axisLabelVisible: true,
+          title: trade.result === "profit" ? `EXIT +${trade.pnlPct}%` : `EXIT ${trade.pnlPct}%`,
+        })
+      );
     }
 
     priceLinesRef.current = lines;
   }, []);
 
-  useEffect(() => { applyPriceLines(activeTrade); }, [activeTrade, applyPriceLines]);
+  useEffect(() => {
+    applyPriceLines(activeTrade);
+  }, [activeTrade, applyPriceLines]);
 
   // ── Marker recalculation ────────────────────────────────────────────────────
   function computeMarkerPositions(): MarkerPosition[] {
-    const chart  = chartRef.current;
+    const chart = chartRef.current;
     const series = seriesRef.current;
     if (!chart || !series) return [];
 
     const barSpacing = chart.timeScale().options().barSpacing;
-    const dotSize    = Math.min(16, Math.max(6, barSpacing * 0.7));
+    const dotSize = Math.min(16, Math.max(6, barSpacing * 1));
 
     return tradesRef.current
       .map((trade) => {
-        // ── Use the stable entryTime timestamp directly — no candle array lookup ──
-        const x = chart.timeScale().timeToCoordinate(trade.entryTime as Time);
+        // Use the visualAnchorTime (exact candle start) to get coordinate
+        const x = chart.timeScale().timeToCoordinate(trade.visualAnchorTime as Time);
         const y = series.priceToCoordinate(trade.entryPrice);
+        
         if (x === null || y === null) return null;
         return { trade, x: x as Coordinate, y: y as Coordinate, dotSize };
       })
@@ -404,7 +487,9 @@ export function CandlestickChart({
   }
 
   const scheduleRecalcRef = useRef(scheduleRecalc);
-  useEffect(() => { scheduleRecalcRef.current = scheduleRecalc; });
+  useEffect(() => {
+    scheduleRecalcRef.current = scheduleRecalc;
+  });
   const stableRecalc = useCallback(() => scheduleRecalcRef.current(), []);
 
   useEffect(() => {
@@ -429,8 +514,8 @@ export function CandlestickChart({
         {/* ── Trade entry dots ── */}
         {markerPositions.map(({ trade, x, y, dotSize }) => {
           const isActive = activeTrade?.id === trade.id;
-          const isBuy    = trade.dir === "buy";
-          const size     = isActive ? dotSize + 4 : dotSize;
+          const isBuy = trade.dir === "buy";
+          const size = isActive ? dotSize + 4 : dotSize;
 
           return (
             <button
@@ -444,23 +529,19 @@ export function CandlestickChart({
               }}
               className={[
                 "absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-zinc-950",
-                "cursor-pointer transition-[width,height,box-shadow] duration-150 focus:outline-none",
+                "animate-pulse cursor-pointer transition-[width,height,box-shadow] duration-150 focus:outline-none",
                 isBuy ? "bg-emerald-500" : "bg-red-500",
-                isActive
-                  ? "shadow-[0_0_25px_rgba(255,255,255,0.3)] ring-2 ring-white/20"
-                  : "hover:brightness-125",
+                isActive ? "shadow-[0_0_25px_rgba(255,255,255,0.3)] ring-2 ring-white/20" : "hover:brightness-125",
               ].join(" ")}
               title={`${trade.dir.toUpperCase()} — click to inspect`}
             >
-              {isActive && (
-                <div className="absolute inset-0 animate-ping rounded-full border border-white/40" />
-              )}
+              {isActive && <div className="absolute inset-0 rounded-full border border-white/40" />}
             </button>
           );
         })}
 
         {/* MA legend */}
-        <div className="pointer-events-none absolute left-4 top-4 z-10 flex items-center gap-4">
+        <div className="pointer-events-none absolute top-4 left-4 z-10 flex items-center gap-4">
           <div className="flex items-center gap-2">
             <div className="h-0.5 w-3 rounded-full bg-blue-500" />
             <span className="text-[9px] font-black tracking-widest text-zinc-500 uppercase">Fast MA</span>

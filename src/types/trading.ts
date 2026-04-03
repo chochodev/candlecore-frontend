@@ -25,7 +25,7 @@ export interface Decision {
 export interface Position {
   id: string;
   symbol: string;
-  side: "long" | "short" | "buy" | "sell";
+  side: "buy" | "sell" | "long" | "short";
   entry_price: number;
   quantity: number;
   current_price: number;
@@ -33,6 +33,7 @@ export interface Position {
   realized_pnl: number;
   opened_at: string;
   closed_at?: string;
+  trailing_sl?: number; // ← Backwards-mapped from engine's internal shield logic
 }
 
 export type TradeDirection = "buy" | "sell";
@@ -46,6 +47,7 @@ export interface Trade {
   entryPrice: number;
   tpPrice: number;
   slPrice: number;
+  dynamicSlPrice?: number; // ← The shifting profit-lock entry
   exitIdx: number | null;
   exitPrice?: number;
   result: TradeResult;
