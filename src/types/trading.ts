@@ -1,38 +1,33 @@
-export type WSEventType = 'candle' | 'decision' | 'position' | 'pnl' | 'status' | 'history';
-
-export interface WSEvent {
-  type: WSEventType;
-  timestamp: string;
-  data: any;
-}
+import type { Time } from "lightweight-charts";
 
 export interface CandleData {
-  symbol: string;
-  timeframe: string;
   timestamp: string;
   open: number;
   high: number;
   low: number;
   close: number;
   volume: number;
-  indicators?: Record<string, number>; // Added for visualization
+  indicators?: {
+    fast_ma?: number;
+    slow_ma?: number;
+    rsi_14?: number;
+  };
 }
 
 export interface Decision {
   timestamp: string;
-  signal: 'buy' | 'sell' | 'hold';
+  signal: "buy" | "sell" | "hold";
   symbol: string;
   price: number;
   quantity: number;
   confidence: number;
   reasoning: string;
-  indicators: Record<string, number>;
 }
 
 export interface Position {
   id: string;
   symbol: string;
-  side: 'buy' | 'sell';
+  side: "long" | "short" | "buy" | "sell";
   entry_price: number;
   quantity: number;
   current_price: number;
@@ -42,9 +37,20 @@ export interface Position {
   closed_at?: string;
 }
 
-export interface PnLData {
-  balance: number;
-  total_pnl: number;
-  unrealized_pnl?: number;
-  win_rate: number;
+export type TradeDirection = "buy" | "sell";
+export type TradeResult = "profit" | "loss" | "open";
+
+export interface Trade {
+  id: string | number;
+  entryIdx: number;
+  dir: TradeDirection;
+  entryPrice: number;
+  tpPrice: number;
+  slPrice: number;
+  exitIdx: number | null;
+  exitPrice?: number;
+  result: TradeResult;
+  pnlPct?: string;
+  timestamp: string;
+  reasoning?: string;
 }

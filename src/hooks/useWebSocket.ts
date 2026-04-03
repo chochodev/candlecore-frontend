@@ -63,28 +63,36 @@ export function useWebSocket(): UseWebSocketReturn {
               });
               break;
 
-            case 'decision':
-              console.info("🎯 NEURAL SIGNAL DETECTED:", wsEvent.data);
-              setDecisions((prev) => [...prev, wsEvent.data]);
-              break;
+      case "decision": {
+        const newD = wsEvent.data;
+        setDecisions((prev) => {
+          const last = prev[prev.length - 1];
+          // Only Record State Transitions (Entry/Exit) that occur on new technical bars
+          if (newD.signal !== "hold" && (!last || (newD.signal !== last.signal && newD.timestamp !== last.timestamp))) {
+            console.log(`[WS] [SIGNAL] ${newD.signal.toUpperCase()} @ ${newD.price}`);
+            return [...prev, newD];
+          }
+          return prev;
+        });
+        break;
+      }
 
-            case 'position':
-              console.info("📊 POSITION UPDATE:", wsEvent.data);
-              setPosition(wsEvent.data);
-              break;
+      case "position":
+        if (wsEvent.data) {
+           console.log(`[WS] [POSITION] ${wsEvent.data.side.toUpperCase()} Entry: ${wsEvent.data.entry_price}`);
+        }
+        setPosition(wsEvent.data);
+        break;
 
             case 'pnl':
-              console.info("💰 PNL UPDATE:", wsEvent.data);
               setPnl(wsEvent.data);
               break;
 
             case 'history':
-              console.info(`🛰️ NEURAL WARP COMPLETE: Batch size: ${wsEvent.data.length} candles`);
               setCandles(wsEvent.data);
               break;
 
             case 'status':
-              console.info(`📟 ENGINE STATUS: ${wsEvent.data.status}`);
               setStatus(wsEvent.data.status);
               if (wsEvent.data.status === 'started' || wsEvent.data.status === 'reset') {
                  setCandles([]);

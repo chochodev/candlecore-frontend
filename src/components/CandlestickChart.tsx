@@ -1,20 +1,105 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
   createChart,
   ColorType,
   LineStyle,
   CandlestickSeries,
   LineSeries,
-  createSeriesMarkers,
   type IChartApi,
   type ISeriesApi,
   type CandlestickData,
   type LineData,
-  type SeriesMarker,
   type Time,
-  type ISeriesMarkersPluginApi,
+  type IPriceLine,
+  type Coordinate,
 } from "lightweight-charts";
-import type { CandleData, Decision } from "@/types/trading";
+import type { CandleData, Decision, Position, Trade } from "@/types/trading";
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function TradeInfoPanel({ trade }: { trade: Trade | null }) {
+  if (!trade) {
+    return (
+      <div className="flex min-h-[56px] items-center justify-between bg-white/2 px-5 py-4">
+        <span className="text-[10px] font-black tracking-widest text-zinc-600 uppercase">
+          Select a tactical anchor to inspect neural telemetry
+        </span>
+        <div className="flex items-center gap-6 text-[9px] font-black text-zinc-500 uppercase italic">
+          <div className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500/50 shadow-[0_0_8px_rgba(16,185,129,0.3)]" /> Entry Vector
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500/50 shadow-[0_0_8px_rgba(239,68,68,0.3)]" /> Target Exit
+          </div>
+          <div className="flex items-center gap-4 border-l border-white/5 pl-6">
+            <div className="flex items-center gap-2">
+              <div className="h-0.5 w-3 rounded-full bg-blue-500" />
+              <span className="text-[9px] font-black tracking-widest uppercase">Fast MA</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-0.5 w-3 rounded-full bg-orange-500" />
+              <span className="text-[9px] font-black tracking-widest uppercase">Slow MA</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const dirLabel = trade.dir === "buy" ? "▲ LONG" : "▼ SHORT";
+  const dirColor = trade.dir === "buy" ? "text-emerald-400" : "text-red-400";
+
+  const badge =
+    trade.result === "open" ? (
+      <div className="inline-flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/10 px-4 py-1.5 text-[10px] font-black tracking-tighter text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+        <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-400" />
+        LIVE EXPOSURE
+      </div>
+    ) : trade.result === "profit" ? (
+      <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 text-[10px] font-black tracking-tighter text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+        ▲ +{trade.pnlPct}% SUCCESS
+      </div>
+    ) : (
+      <div className="inline-flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-1.5 text-[10px] font-black tracking-tighter text-red-400">
+        ▼ {trade.pnlPct}% RECOVERY
+      </div>
+    );
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/5 bg-white/3 p-5 shadow-2xl transition-all animate-in slide-in-from-bottom-2">
+      <div className="flex flex-wrap items-center gap-6 font-mono text-[10px]">
+        <div className="flex flex-col">
+          <span className="mb-1 text-[8px] font-black tracking-widest text-zinc-600 uppercase">Asset Direction</span>
+          <span className={`text-[12px] font-black tracking-tighter ${dirColor}`}>{dirLabel}</span>
+        </div>
+        <div className="h-8 w-px bg-white/5" />
+        <div className="flex flex-col">
+          <span className="mb-1 text-[8px] font-black tracking-widest text-zinc-600 uppercase">Entry Quote</span>
+          <span className="text-[11px] font-bold text-zinc-100">${trade.entryPrice.toFixed(2)}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="mb-1 text-[8px] font-black tracking-widest text-blue-600/60 uppercase">Target TP</span>
+          <span className="text-[11px] font-bold text-blue-400">${trade.tpPrice.toFixed(2)}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="mb-1 text-[8px] font-black tracking-widest text-red-600/60 uppercase">Neural SL</span>
+          <span className="text-[11px] font-bold text-red-400">${trade.slPrice.toFixed(2)}</span>
+        </div>
+        {trade.exitPrice !== undefined && (
+          <div className="flex flex-col">
+            <span className="mb-1 text-[8px] font-black tracking-widest text-zinc-600 uppercase">Final Result</span>
+            <span className={`text-[11px] font-bold ${trade.result === "profit" ? "text-emerald-400" : "text-white"}`}>
+              ${trade.exitPrice.toFixed(2)}
+            </span>
+          </div>
+        )}
+      </div>
+      {badge}
+    </div>
+  );
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CandlestickChartProps {
   candles: CandleData[];
@@ -22,45 +107,158 @@ interface CandlestickChartProps {
   activeSymbol?: string;
   timeframe?: string;
   isSearching?: boolean;
+  activePosition: Position | null;
 }
 
-export function CandlestickChart({ candles, decisions, activeSymbol, timeframe, isSearching }: CandlestickChartProps) {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const fastMaRef = useRef<ISeriesApi<"Line"> | null>(null);
-  const slowMaRef = useRef<ISeriesApi<"Line"> | null>(null);
-  const markersApiRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
-  const hasFittedRef = useRef(false);
+type MarkerPosition = {
+  trade: Trade;
+  x: Coordinate;
+  y: Coordinate;
+  dotSize: number; // px, derived from barSpacing at recalc time
+};
 
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export function CandlestickChart({
+  candles,
+  decisions,
+  activeSymbol = "SOL",
+  timeframe = "1h",
+  isSearching = false,
+  activePosition,
+}: CandlestickChartProps) {
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef    = useRef<IChartApi | null>(null);
+  const seriesRef   = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const fastMaRef   = useRef<ISeriesApi<"Line"> | null>(null);
+  const slowMaRef   = useRef<ISeriesApi<"Line"> | null>(null);
+  const priceLinesRef = useRef<IPriceLine[]>([]);
+  const hasFittedRef  = useRef(false);
+  const rafRef        = useRef<number>(0);
+
+  const [selectedTradeId, setSelectedTradeId] = useState<string | number | null>(null);
+  const [markerPositions, setMarkerPositions]   = useState<MarkerPosition[]>([]);
+
+  // ── Build trades (pure derivation via useMemo) ──────────────────────────────
+  const trades = useMemo(() => {
+    if (!candles.length) return [];
+
+    const result: Trade[] = [];
+    let current: Partial<Trade> | null = null;
+
+    decisions.forEach((d, idx) => {
+      const entryTime = new Date(d.timestamp).getTime();
+      let candleIdx = candles.findIndex((c) => new Date(c.timestamp).getTime() === entryTime);
+
+      if (candleIdx === -1) {
+        for (let i = candles.length - 1; i >= 0; i--) {
+          if (new Date(candles[i].timestamp).getTime() <= entryTime) {
+            candleIdx = i;
+            break;
+          }
+        }
+      }
+
+      if (candleIdx === -1) return;
+
+      if (d.signal === "buy") {
+        current = {
+          id: `t-${idx}`,
+          entryIdx: candleIdx,
+          dir: "buy",
+          entryPrice: d.price,
+          tpPrice: d.price * 1.015,
+          slPrice: d.price * 0.985,
+          timestamp: d.timestamp,
+          reasoning: d.reasoning,
+          exitIdx: null,
+          result: "open",
+        };
+      } else if (d.signal === "sell" && current) {
+        const pnl = ((d.price - current.entryPrice!) / current.entryPrice!) * 100;
+        result.push({
+          ...(current as Trade),
+          exitIdx: candleIdx,
+          exitPrice: d.price,
+          result: pnl >= 0 ? "profit" : "loss",
+          pnlPct: pnl.toFixed(2),
+        });
+        current = null;
+      }
+    });
+
+    if (current) {
+      result.push(current as Trade);
+    }
+
+    if (activePosition && !result.find((t) => t.id === "active")) {
+      const entryTime = new Date(activePosition.opened_at).getTime();
+      let candleIdx = -1;
+      for (let i = candles.length - 1; i >= 0; i--) {
+        if (new Date(candles[i].timestamp).getTime() <= entryTime) {
+          candleIdx = i;
+          break;
+        }
+      }
+
+      if (candleIdx !== -1) {
+        result.push({
+          id: "active",
+          entryIdx: candleIdx,
+          dir: activePosition.side === "long" || activePosition.side === "buy" ? "buy" : "sell",
+          entryPrice: activePosition.entry_price,
+          tpPrice: activePosition.entry_price * 1.015,
+          slPrice: activePosition.entry_price * 0.985,
+          exitIdx: null,
+          result: "open",
+          timestamp: activePosition.opened_at,
+          reasoning: "Active Engine Exposure",
+        } as Trade);
+      }
+    }
+
+    return result;
+  }, [decisions, candles, activePosition]);
+
+  const tradesRef = useRef<Trade[]>(trades);
+  useEffect(() => { tradesRef.current = trades; }, [trades]);
+
+  // Also mirror candles into a ref for the same reason
+  const candlesRef = useRef<CandleData[]>(candles);
+  useEffect(() => { candlesRef.current = candles; }, [candles]);
+
+  const activeTrade = useMemo(() => {
+    if (selectedTradeId !== null) return trades.find((t) => t.id === selectedTradeId) ?? null;
+    if (activePosition)          return trades.find((t) => t.id === "active") ?? null;
+    return null;
+  }, [trades, selectedTradeId, activePosition]);
+
+  // ── Chart init ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: "#0c0c0e" },
-        textColor: "#a1a1aa",
+        textColor: "#71717a",
         fontFamily: "var(--font-mono, monospace)",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: "rgba(255, 255, 255, 0.03)", style: LineStyle.Dotted },
-        horzLines: { color: "rgba(255, 255, 255, 0.03)", style: LineStyle.Dotted },
+        vertLines: { color: "rgba(255,255,255,0.03)", style: LineStyle.Dotted },
+        horzLines: { color: "rgba(255,255,255,0.03)", style: LineStyle.Dotted },
       },
-      rightPriceScale: {
-        borderColor: "rgba(255, 255, 255, 0.05)",
-        autoScale: true,
-      },
+      rightPriceScale: { borderColor: "rgba(255,255,255,0.05)", autoScale: true },
       timeScale: {
-        borderColor: "rgba(255, 255, 255, 0.05)",
+        borderColor: "rgba(255,255,255,0.05)",
         timeVisible: true,
         secondsVisible: false,
         barSpacing: 10,
-        rightOffset: 10,
+        rightOffset: 20,
       },
       crosshair: {
-        vertLine: { labelBackgroundColor: "#10b981" },
-        horzLine: { labelBackgroundColor: "#10b981" },
+        vertLine: { labelBackgroundColor: "#10b981", color: "rgba(16,185,129,0.2)" },
+        horzLine: { labelBackgroundColor: "#10b981", color: "rgba(16,185,129,0.2)" },
       },
     });
 
@@ -88,163 +286,231 @@ export function CandlestickChart({ candles, decisions, activeSymbol, timeframe, 
       crosshairMarkerVisible: false,
     });
 
-    const markersApi = createSeriesMarkers(candleSeries);
-
-    chartRef.current = chart;
+    chartRef.current  = chart;
     seriesRef.current = candleSeries;
     fastMaRef.current = fastMaSeries;
     slowMaRef.current = slowMaSeries;
-    markersApiRef.current = markersApi;
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      if (entries.length === 0 || !entries[0].contentRect) return;
+    const ro = new ResizeObserver((entries) => {
+      if (!entries[0]?.contentRect) return;
       const { width, height } = entries[0].contentRect;
       chart.applyOptions({ width, height });
     });
-
-    resizeObserver.observe(chartContainerRef.current);
+    ro.observe(chartContainerRef.current);
 
     return () => {
-      resizeObserver.disconnect();
+      cancelAnimationFrame(rafRef.current);
+      ro.disconnect();
       chart.remove();
+      chartRef.current  = null;
+      seriesRef.current = null;
+      fastMaRef.current = null;
+      slowMaRef.current = null;
+      priceLinesRef.current = [];
     };
   }, []);
 
+  // ── Feed candle data ────────────────────────────────────────────────────────
   useEffect(() => {
-    if (candles.length === 0) {
-      hasFittedRef.current = false;
-      return;
-    }
+    if (!candles.length || !seriesRef.current) return;
 
     const candleData: CandlestickData[] = candles
       .map((c) => {
-        try {
-          const time = Math.floor(new Date(c.timestamp).getTime() / 1000);
-          if (isNaN(time)) return null;
-          return {
-            time: time as Time,
-            open: c.open,
-            high: c.high,
-            low: c.low,
-            close: c.close,
-          };
-        } catch (e) {
-          return null;
-        }
+        const time = Math.floor(new Date(c.timestamp).getTime() / 1000);
+        if (isNaN(time)) return null;
+        return { time: time as Time, open: c.open, high: c.high, low: c.low, close: c.close };
       })
-      .filter((c): c is CandlestickData => c !== null);
+      .filter((c): c is CandlestickData => c !== null)
+      .sort((a, b) => (a.time as number) - (b.time as number));
 
-    if (candleData.length === 0) return;
+    seriesRef.current.setData(candleData);
 
     const fastMaData: LineData[] = candles
-      .filter((c) => c.indicators?.fast_ma)
-      .map((c) => {
-        const time = Math.floor(new Date(c.timestamp).getTime() / 1000);
-        return { time: time as Time, value: c.indicators!.fast_ma! };
-      })
-      .filter((d) => !isNaN(d.time as number));
+      .filter((c) => c.indicators?.fast_ma != null)
+      .map((c) => ({ time: Math.floor(new Date(c.timestamp).getTime() / 1000) as Time, value: c.indicators!.fast_ma! }))
+      .sort((a, b) => (a.time as number) - (b.time as number));
 
     const slowMaData: LineData[] = candles
-      .filter((c) => c.indicators?.slow_ma)
-      .map((c) => {
-        const time = Math.floor(new Date(c.timestamp).getTime() / 1000);
-        return { time: time as Time, value: c.indicators!.slow_ma! };
-      })
-      .filter((d) => !isNaN(d.time as number));
+      .filter((c) => c.indicators?.slow_ma != null)
+      .map((c) => ({ time: Math.floor(new Date(c.timestamp).getTime() / 1000) as Time, value: c.indicators!.slow_ma! }))
+      .sort((a, b) => (a.time as number) - (b.time as number));
 
-    // Enforce ascending time order for lightweight-charts
-    candleData.sort((a, b) => (a.time as number) - (b.time as number));
-    fastMaData.sort((a, b) => (a.time as number) - (b.time as number));
-    slowMaData.sort((a, b) => (a.time as number) - (b.time as number));
+    fastMaRef.current?.setData(fastMaData);
+    slowMaRef.current?.setData(slowMaData);
 
-    if (seriesRef.current) seriesRef.current.setData(candleData);
-    if (fastMaRef.current) fastMaRef.current.setData(fastMaData);
-    if (slowMaRef.current) slowMaRef.current.setData(slowMaData);
-
-    // Only scroll to real time on the first batch of significant data
     if (!hasFittedRef.current && candleData.length > 5) {
       chartRef.current?.timeScale().scrollToRealTime();
       hasFittedRef.current = true;
     }
 
-    // Trade Markers
-    const markers: SeriesMarker<Time>[] = decisions
-      .map((d, index) => ({
-        time: Math.floor(new Date(d.timestamp).getTime() / 1000) as Time,
-        position: (d.signal === "buy" ? "belowBar" : d.signal === "sell" ? "aboveBar" : "inBar") as any,
-        color: d.signal === "buy" ? "#10b981" : d.signal === "sell" ? "#ef4444" : "#6b7280",
-        shape: (d.signal === "buy" ? "arrowUp" : d.signal === "sell" ? "arrowDown" : "circle") as any,
-        text: index === decisions.length - 1 ? `LAST ${d.signal.toUpperCase()}` : d.signal.toUpperCase(),
-        size: 2,
-      }))
-      .filter((m) => !m.text.includes("HOLD"))
-      .sort((a, b) => (a.time as number) - (b.time as number));
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(scheduleRecalc);
+  }, [candles]);
 
-    if (markersApiRef.current) {
-      markersApiRef.current.setMarkers(markers);
+  // ── Price lines — fully imperative, no cleanup-return anti-pattern ──────────
+  const applyPriceLines = useCallback((trade: Trade | null) => {
+    priceLinesRef.current.forEach((l) => {
+      try { seriesRef.current?.removePriceLine(l); } catch (_) {}
+    });
+    priceLinesRef.current = [];
+
+    if (!trade || !seriesRef.current) return;
+
+    const s = seriesRef.current;
+    const lines: IPriceLine[] = [
+      s.createPriceLine({ price: trade.entryPrice, color: "#10b981", lineWidth: 2, lineStyle: LineStyle.Solid,  axisLabelVisible: true, title: "ENTRY"        }),
+      s.createPriceLine({ price: trade.tpPrice,    color: "#3b82f6", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "TARGET (TP)"  }),
+      s.createPriceLine({ price: trade.slPrice,    color: "#ef4444", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "NEURAL SL"    }),
+    ];
+
+    if (trade.exitPrice !== undefined) {
+      lines.push(s.createPriceLine({
+        price: trade.exitPrice,
+        color: trade.result === "profit" ? "#10b981" : "#ef4444",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+        axisLabelVisible: true,
+        title: trade.result === "profit" ? `EXIT +${trade.pnlPct}%` : `EXIT ${trade.pnlPct}%`,
+      }));
     }
-  }, [candles, decisions]);
 
+    priceLinesRef.current = lines;
+  }, []); // stable — reads refs only
+
+  useEffect(() => { applyPriceLines(activeTrade); }, [activeTrade, applyPriceLines]);
+
+  // ── Marker recalculation ────────────────────────────────────────────────────
+  function computeMarkerPositions(): MarkerPosition[] {
+    const chart  = chartRef.current;
+    const series = seriesRef.current;
+    const currentCandles = candlesRef.current;
+    if (!chart || !series || !currentCandles.length) return [];
+
+    const barSpacing = chart.timeScale().options().barSpacing;
+    const dotSize    = Math.min(16, Math.max(6, barSpacing * 0.7));
+
+    return tradesRef.current
+      .map((trade) => {
+        if (trade.entryIdx === -1) return null; // No technical anchor available in current buffer
+        const candle = currentCandles[trade.entryIdx];
+        const time = Math.floor(new Date(candle.timestamp).getTime() / 1000) as Time;
+        const x = chart.timeScale().timeToCoordinate(time);
+        const y = series.priceToCoordinate(trade.entryPrice);
+        if (x === null || y === null) return null;
+        return { trade, x: x as Coordinate, y: y as Coordinate, dotSize };
+      })
+      .filter((p): p is MarkerPosition => p !== null);
+  }
+
+  function scheduleRecalc() {
+    setMarkerPositions(computeMarkerPositions());
+  }
+
+  // Stable ref wrapper so the subscription never goes stale
+  const scheduleRecalcRef = useRef(scheduleRecalc);
+  useEffect(() => { scheduleRecalcRef.current = scheduleRecalc; });
+  const stableRecalc = useCallback(() => scheduleRecalcRef.current(), []);
+
+  // Subscribe once (logical range fires on every pan/zoom/barSpacing change)
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.timeScale().subscribeVisibleLogicalRangeChange(stableRecalc);
+    stableRecalc();
+    return () => chart.timeScale().unsubscribeVisibleLogicalRangeChange(stableRecalc);
+  }, [stableRecalc]);
+
+  // Re-fire whenever trades rebuild
+  useEffect(() => {
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(stableRecalc);
+  }, [trades, stableRecalc]);
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="relative h-full w-full">
-      <div ref={chartContainerRef} className="dot-grid h-full w-full opacity-90 brightness-110" />
+    <div className="relative flex h-full w-full flex-col overflow-hidden">
+      <div className="relative min-h-0 flex-1 overflow-hidden border border-zinc-100/5 bg-dark-core shadow-2xl">
+        {/* lightweight-charts canvas */}
+        <div ref={chartContainerRef} className="dot-grid h-full w-full opacity-90" />
 
-      {candles.length === 0 && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-dark-core/75 backdrop-blur-xl transition-all duration-700 animate-in fade-in zoom-in-95">
-          <div className="relative max-w-sm overflow-hidden rounded-3xl border border-white/5 bg-linear-to-b from-white/2 to-transparent p-10 text-center shadow-2xl shadow-black/50">
-            {/* 🌌 GLOWING NEURAL CORE */}
-            <div className="relative mx-auto mb-8 flex h-18 w-18 items-center justify-center rounded-[2rem] bg-emerald-500/10 shadow-[0_0_80px_-15px_rgba(16,185,129,0.4)] transition-transform hover:scale-110">
-              <div className="absolute inset-0 animate-pulse rounded-[2rem] border border-emerald-500/20" />
-              <svg
-                className={`h-8 w-8 text-emerald-500 ${isSearching ? "animate-spin" : "animate-[pulse_3s_infinite]"}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
+        {/* ── Trade entry dots ── */}
+        {markerPositions.map(({ trade, x, y, dotSize }) => {
+          const isActive = activeTrade?.id === trade.id;
+          const isBuy    = trade.dir === "buy";
+          const size     = isActive ? dotSize + 4 : dotSize;
 
-            <p className="mb-10 text-sm font-semibold tracking-[.3em] text-gray-400 uppercase">
-              Simulation Engine v1.3.1
-            </p>
+          return (
+            <button
+              key={trade.id}
+              onClick={() => setSelectedTradeId((prev) => (prev === trade.id ? null : trade.id))}
+              style={{
+                left: x,
+                top: y,
+                width: size,
+                height: size,
+                // Inline sizing only — Tailwind h/w classes would lose to barSpacing math
+              }}
+              className={[
+                "absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-zinc-950",
+                "cursor-pointer transition-[width,height,box-shadow] duration-150 focus:outline-none",
+                isBuy ? "bg-emerald-500" : "bg-red-500",
+                isActive
+                  ? "shadow-[0_0_25px_rgba(255,255,255,0.3)] ring-2 ring-white/20"
+                  : "hover:brightness-125",
+              ].join(" ")}
+              title={`${trade.dir.toUpperCase()} — click to inspect`}
+            >
+              {isActive && (
+                <div className="absolute inset-0 animate-ping rounded-full border border-white/40" />
+              )}
+            </button>
+          );
+        })}
 
-            <div className="mb-10 grid grid-cols-2 gap-4">
-              <div className="group rounded-2xl border border-white/5 bg-white/2 p-4 transition-all hover:bg-white/5">
-                <p className="mb-1.5 text-[9px] font-black tracking-widest text-gray-600 uppercase">Neural Strat</p>
-                <p className="text-[11px] font-bold text-emerald-400 uppercase">Pulse Scalper</p>
-              </div>
-              <div className="group rounded-2xl border border-white/5 bg-white/2 p-4 transition-all hover:bg-white/5">
-                <p className="mb-1.5 text-[9px] font-black tracking-widest text-gray-600 uppercase">Simulation</p>
-                <p className="text-[11px] font-bold text-emerald-400 uppercase">Live Ready</p>
-              </div>
-            </div>
-
-            <p className="text-[11px] leading-relaxed font-medium tracking-tight text-gray-400/70 uppercase">
-              Synchronize the neural stream to begin high-fidelity analysis of the{" "}
-              <span className="font-bold text-white">{activeSymbol?.toUpperCase() || "SOL"} / {timeframe || "1h"}</span> pulse.
-            </p>
-
-            {/* 🔘 DECORATIVE CORNER ACCENTS */}
-            <div className="absolute top-0 right-0 h-10 w-10 overflow-hidden">
-              <div className="absolute -top-5 -right-5 h-10 w-10 rotate-45 border-r border-emerald-500/20" />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Internal Legend */}
-      <div className="pointer-events-none absolute top-6 left-6 z-10 flex flex-col gap-2">
-        <div className="flex items-center gap-4">
+        {/* MA legend */}
+        <div className="pointer-events-none absolute left-4 top-4 z-10 flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <div className="h-0.5 w-3 bg-blue-500" />
-            <span className="text-[9px] font-black text-gray-500 uppercase">Neural Fast</span>
+            <div className="h-0.5 w-3 rounded-full bg-blue-500" />
+            <span className="text-[9px] font-black tracking-widest text-zinc-500 uppercase">Fast MA</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="h-0.5 w-3 bg-orange-500" />
-            <span className="text-[9px] font-black text-gray-500 uppercase">Neural Slow</span>
+            <div className="h-0.5 w-3 rounded-full bg-orange-500" />
+            <span className="text-[9px] font-black tracking-widest text-zinc-500 uppercase">Slow MA</span>
           </div>
         </div>
+
+        {/* Empty state */}
+        {candles.length === 0 && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-dark-core/80 backdrop-blur-xl">
+            <div className="relative max-w-sm rounded-3xl border border-white/5 bg-linear-to-b from-white/2 to-transparent p-10 text-center shadow-2xl">
+              <div className="relative mx-auto mb-8 flex h-18 w-18 items-center justify-center rounded-[2rem] bg-emerald-500/10 shadow-[0_0_80px_-15px_rgba(16,185,129,0.4)]">
+                <div className="absolute inset-0 animate-pulse rounded-[2rem] border border-emerald-500/20" />
+                <svg
+                  className={`h-8 w-8 text-emerald-500 ${isSearching ? "animate-spin" : "animate-pulse"}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <p className="mb-4 text-[11px] font-black tracking-[.3em] text-zinc-500 uppercase">
+                Simulation Engine v1.3.1
+              </p>
+              <p className="text-[11px] leading-relaxed font-medium text-zinc-400 uppercase">
+                Ready for{" "}
+                <span className="font-black text-white">
+                  {activeSymbol.toUpperCase()} / {timeframe}
+                </span>{" "}
+                stream
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="shrink-0">
+        <TradeInfoPanel trade={activeTrade} />
       </div>
     </div>
   );

@@ -19,7 +19,7 @@ import { Logo } from "@/components/Logo";
 import "./dashboard.css";
 
 export function Dashboard() {
-  const { candles, setCandles, decisions, setDecisions, position, pnl, setPnl, isConnected, status, connect } = useWebSocket();
+  const { candles, setCandles, decisions, setDecisions, position, pnl, setPnl, status, connect } = useWebSocket();
   const [botStatus, setBotStatus] = useState<any>(null);
   const [symbols, setSymbols] = useState<string[]>([]);
   const [timeframes, setTimeframes] = useState<string[]>([]);
@@ -114,6 +114,13 @@ export function Dashboard() {
       return null;
     }
   };
+
+  // Auto-expand sidebar when a trade is detected
+  useEffect(() => {
+    if (position && !sidebarExpanded) {
+      setSidebarExpanded(true);
+    }
+  }, [position]);
 
   const handleStart = async () => {
     try {
@@ -406,12 +413,13 @@ export function Dashboard() {
       <main className="relative flex-1 overflow-hidden">
         {/* Full-bleed Immersive Chart */}
         <div className="h-full w-full overflow-hidden bg-dark-core">
-          <CandlestickChart 
-            candles={candles} 
-            decisions={decisions} 
-            activeSymbol={config.symbol} 
+          <CandlestickChart
+            candles={candles}
+            decisions={decisions}
+            activeSymbol={config.symbol}
             timeframe={config.timeframe}
             isSearching={botStatus?.running && candles.length === 0}
+            activePosition={position}
           />
         </div>
 
@@ -576,30 +584,50 @@ export function Dashboard() {
         {status === "skipping" && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md transition-all animate-in fade-in zoom-in-95">
             <div className="relative max-w-sm rounded-[2.5rem] border border-white/5 bg-linear-to-b from-white/5 to-transparent p-12 text-center shadow-2xl">
-               {/* Glowing Background Glow */}
-               <div className="absolute -top-10 -left-10 h-32 w-32 bg-emerald-500/10 blur-3xl opacity-50 rounded-full" />
-               <div className="absolute -bottom-10 -right-10 h-16 w-32 bg-blue-500/10 blur-3xl opacity-50 rounded-full" />
+              {/* Glowing Background Glow */}
+              <div className="absolute -top-10 -left-10 h-32 w-32 rounded-full bg-emerald-500/10 opacity-50 blur-3xl" />
+              <div className="absolute -right-10 -bottom-10 h-16 w-32 rounded-full bg-blue-500/10 opacity-50 blur-3xl" />
 
               <div className="relative z-10">
                 <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-500/10 shadow-[0_0_60px_-10px_rgba(16,185,129,0.4)]">
-                  <svg className="h-10 w-10 animate-spin text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <svg
+                    className="h-10 w-10 animate-spin text-emerald-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
                   </svg>
                 </div>
-                
-                <h3 className="mb-2 text-2xl font-bold tracking-tight text-white transition-all hover:text-emerald-400">Neural Warp Search</h3>
-                <p className="mb-10 text-[10px] font-bold tracking-[.3em] text-gray-500 uppercase">Finding Next Technical Signal</p>
-                
+
+                <h3 className="mb-2 text-2xl font-bold tracking-tight text-white transition-all hover:text-emerald-400">
+                  Neural Warp Search
+                </h3>
+                <p className="mb-10 text-[10px] font-bold tracking-[.3em] text-gray-500 uppercase">
+                  Finding Next Technical Signal
+                </p>
+
                 <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-5 py-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
                   <span className="text-[10px] font-bold text-emerald-400">Analysing 17,000+ Candles...</span>
                 </div>
               </div>
 
-               {/* Decorative corner accents */}
-                <div className="absolute top-0 right-0 h-10 w-10 border-t border-r border-white/10 rounded-tr-[2.5rem]" />
-                <div className="absolute bottom-0 left-0 h-10 w-10 border-b border-l border-white/10 rounded-bl-[2.5rem]" />
+              {/* Decorative corner accents */}
+              <div className="absolute top-0 right-0 h-10 w-10 rounded-tr-[2.5rem] border-t border-r border-white/10" />
+              <div className="absolute bottom-0 left-0 h-10 w-10 rounded-bl-[2.5rem] border-b border-l border-white/10" />
             </div>
           </div>
         )}
