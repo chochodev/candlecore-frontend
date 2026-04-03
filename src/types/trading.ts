@@ -1,5 +1,3 @@
-import type { Time } from "lightweight-charts";
-
 export interface CandleData {
   timestamp: string;
   open: number;
@@ -43,6 +41,7 @@ export type TradeResult = "profit" | "loss" | "open";
 export interface Trade {
   id: string | number;
   entryIdx: number;
+  entryTime: number; // ← stable Unix-seconds anchor (no candle array lookup)
   dir: TradeDirection;
   entryPrice: number;
   tpPrice: number;

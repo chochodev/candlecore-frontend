@@ -114,7 +114,7 @@ type MarkerPosition = {
   trade: Trade;
   x: Coordinate;
   y: Coordinate;
-  dotSize: number; // px, derived from barSpacing at recalc time
+  dotSize: number;
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -139,7 +139,7 @@ export function CandlestickChart({
   const [selectedTradeId, setSelectedTradeId] = useState<string | number | null>(null);
   const [markerPositions, setMarkerPositions]   = useState<MarkerPosition[]>([]);
 
-  // ── Build trades (pure derivation via useMemo) ──────────────────────────────
+  // ── Build trades ────────────────────────────────────────────────────────────
   const trades = useMemo(() => {
     if (!candles.length) return [];
 
@@ -148,8 +148,10 @@ export function CandlestickChart({
 
     decisions.forEach((d, idx) => {
       const entryTime = new Date(d.timestamp).getTime();
-      let candleIdx = candles.findIndex((c) => new Date(c.timestamp).getTime() === entryTime);
+      // ── stable Unix-seconds timestamp stored directly on the trade ──
+      const entryTimeSec = Math.floor(entryTime / 1000);
 
+      let candleIdx = candles.findIndex((c) => new Date(c.timestamp).getTime() === entryTime);
       if (candleIdx === -1) {
         for (let i = candles.length - 1; i >= 0; i--) {
           if (new Date(candles[i].timestamp).getTime() <= entryTime) {
@@ -158,13 +160,13 @@ export function CandlestickChart({
           }
         }
       }
-
       if (candleIdx === -1) return;
 
       if (d.signal === "buy") {
         current = {
           id: `t-${idx}`,
           entryIdx: candleIdx,
+          entryTime: entryTimeSec, // ← stable anchor
           dir: "buy",
           entryPrice: d.price,
           tpPrice: d.price * 1.015,
@@ -193,6 +195,7 @@ export function CandlestickChart({
 
     if (activePosition && !result.find((t) => t.id === "active")) {
       const entryTime = new Date(activePosition.opened_at).getTime();
+      const entryTimeSec = Math.floor(entryTime / 1000); // ← stable anchor
       let candleIdx = -1;
       for (let i = candles.length - 1; i >= 0; i--) {
         if (new Date(candles[i].timestamp).getTime() <= entryTime) {
@@ -205,6 +208,7 @@ export function CandlestickChart({
         result.push({
           id: "active",
           entryIdx: candleIdx,
+          entryTime: entryTimeSec, // ← stable anchor
           dir: activePosition.side === "long" || activePosition.side === "buy" ? "buy" : "sell",
           entryPrice: activePosition.entry_price,
           tpPrice: activePosition.entry_price * 1.015,
@@ -222,10 +226,6 @@ export function CandlestickChart({
 
   const tradesRef = useRef<Trade[]>(trades);
   useEffect(() => { tradesRef.current = trades; }, [trades]);
-
-  // Also mirror candles into a ref for the same reason
-  const candlesRef = useRef<CandleData[]>(candles);
-  useEffect(() => { candlesRef.current = candles; }, [candles]);
 
   const activeTrade = useMemo(() => {
     if (selectedTradeId !== null) return trades.find((t) => t.id === selectedTradeId) ?? null;
@@ -347,7 +347,7 @@ export function CandlestickChart({
     rafRef.current = requestAnimationFrame(scheduleRecalc);
   }, [candles]);
 
-  // ── Price lines — fully imperative, no cleanup-return anti-pattern ──────────
+  // ── Price lines ─────────────────────────────────────────────────────────────
   const applyPriceLines = useCallback((trade: Trade | null) => {
     priceLinesRef.current.forEach((l) => {
       try { seriesRef.current?.removePriceLine(l); } catch (_) {}
@@ -375,7 +375,7 @@ export function CandlestickChart({
     }
 
     priceLinesRef.current = lines;
-  }, []); // stable — reads refs only
+  }, []);
 
   useEffect(() => { applyPriceLines(activeTrade); }, [activeTrade, applyPriceLines]);
 
@@ -383,18 +383,15 @@ export function CandlestickChart({
   function computeMarkerPositions(): MarkerPosition[] {
     const chart  = chartRef.current;
     const series = seriesRef.current;
-    const currentCandles = candlesRef.current;
-    if (!chart || !series || !currentCandles.length) return [];
+    if (!chart || !series) return [];
 
     const barSpacing = chart.timeScale().options().barSpacing;
     const dotSize    = Math.min(16, Math.max(6, barSpacing * 0.7));
 
     return tradesRef.current
       .map((trade) => {
-        if (trade.entryIdx === -1) return null; // No technical anchor available in current buffer
-        const candle = currentCandles[trade.entryIdx];
-        const time = Math.floor(new Date(candle.timestamp).getTime() / 1000) as Time;
-        const x = chart.timeScale().timeToCoordinate(time);
+        // ── Use the stable entryTime timestamp directly — no candle array lookup ──
+        const x = chart.timeScale().timeToCoordinate(trade.entryTime as Time);
         const y = series.priceToCoordinate(trade.entryPrice);
         if (x === null || y === null) return null;
         return { trade, x: x as Coordinate, y: y as Coordinate, dotSize };
@@ -406,12 +403,10 @@ export function CandlestickChart({
     setMarkerPositions(computeMarkerPositions());
   }
 
-  // Stable ref wrapper so the subscription never goes stale
   const scheduleRecalcRef = useRef(scheduleRecalc);
   useEffect(() => { scheduleRecalcRef.current = scheduleRecalc; });
   const stableRecalc = useCallback(() => scheduleRecalcRef.current(), []);
 
-  // Subscribe once (logical range fires on every pan/zoom/barSpacing change)
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -420,7 +415,6 @@ export function CandlestickChart({
     return () => chart.timeScale().unsubscribeVisibleLogicalRangeChange(stableRecalc);
   }, [stableRecalc]);
 
-  // Re-fire whenever trades rebuild
   useEffect(() => {
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(stableRecalc);
@@ -430,7 +424,6 @@ export function CandlestickChart({
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
       <div className="relative min-h-0 flex-1 overflow-hidden border border-zinc-100/5 bg-dark-core shadow-2xl">
-        {/* lightweight-charts canvas */}
         <div ref={chartContainerRef} className="dot-grid h-full w-full opacity-90" />
 
         {/* ── Trade entry dots ── */}
@@ -448,7 +441,6 @@ export function CandlestickChart({
                 top: y,
                 width: size,
                 height: size,
-                // Inline sizing only — Tailwind h/w classes would lose to barSpacing math
               }}
               className={[
                 "absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-zinc-950",
