@@ -193,8 +193,8 @@ export function CandlestickChart({
           visualAnchorTime: anchorTime, // Sync anchor to candle start
           dir: "buy",
           entryPrice: d.price,
-          tpPrice: d.price * 1.015,
-          slPrice: d.price * 0.985,
+          tpPrice: d.price * 1.0145,
+          slPrice: d.price * 0.9855,
           timestamp: d.timestamp,
           reasoning: d.reasoning,
           exitIdx: null,
@@ -248,10 +248,10 @@ export function CandlestickChart({
           entryIdx: candleIdx,
           entryTime: entryTimeSec,
           visualAnchorTime: anchorTime,
-          dir: activePosition.side === "long" || activePosition.side === "buy" || activePosition.side === "Buy" ? "buy" : "sell",
+          dir: activePosition.side.toLowerCase() === "buy" || activePosition.side.toLowerCase() === "long" ? "buy" : "sell",
           entryPrice: activePosition.entry_price,
-          tpPrice: activePosition.side === "long" || activePosition.side === "buy" ? activePosition.entry_price * 1.015 : activePosition.entry_price * 0.985,
-          slPrice: activePosition.side === "long" || activePosition.side === "buy" ? activePosition.entry_price * 0.985 : activePosition.entry_price * 1.015,
+          tpPrice: activePosition.side.toLowerCase() === "buy" || activePosition.side.toLowerCase() === "long" ? activePosition.entry_price * 1.0145 : activePosition.entry_price * 0.9855,
+          slPrice: activePosition.trailing_sl || (activePosition.side.toLowerCase() === "buy" || activePosition.side.toLowerCase() === "long" ? activePosition.entry_price * 0.9855 : activePosition.entry_price * 1.0145),
           exitIdx: null,
           result: "open",
           timestamp: activePosition.opened_at,
@@ -470,12 +470,12 @@ export function CandlestickChart({
     const barSpacing = chart.timeScale().options().barSpacing;
     const dotSize = Math.min(16, Math.max(6, barSpacing * 1));
 
-    return tradesRef.current
+    return (tradesRef.current || [])
       .map((trade) => {
         // Use the visualAnchorTime (exact candle start) to get coordinate
         const x = chart.timeScale().timeToCoordinate(trade.visualAnchorTime as Time);
         const y = series.priceToCoordinate(trade.entryPrice);
-        
+
         if (x === null || y === null) return null;
         return { trade, x: x as Coordinate, y: y as Coordinate, dotSize };
       })

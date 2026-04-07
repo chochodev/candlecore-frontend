@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { botAPI, type BotConfig } from "@/lib/api";
 import { CandlestickChart } from "@/components/CandlestickChart";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -18,25 +18,71 @@ import {
 import { Logo } from "@/components/Logo";
 import "./dashboard.css";
 
+import { useShallow } from 'zustand/shallow';
+import { useDashboardStore } from "@/zustand";
+
 export function Dashboard() {
-  const { candles, setCandles, decisions, setDecisions, position, pnl, setPnl, status, connect } = useWebSocket();
-  const [botStatus, setBotStatus] = useState<any>(null);
-  const [symbols, setSymbols] = useState<string[]>([]);
-  const [timeframes, setTimeframes] = useState<string[]>([]);
-  const [configOpen, setConfigOpen] = useState(false);
-  const [config, setConfig] = useState<BotConfig>({
-    symbol: "sol",
-    timeframe: "1h",
-    strategy: "ma_crossover",
-    replay_mode: true,
-    dry_run: true,
-    replay_speed: 1.0,
-  });
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
-  const [sidebarPos, setSidebarPos] = useState({ x: 16, y: 72 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [configError, setConfigError] = useState<string | null>(null);
+  const { pathname } = useLocation();
+  const { connect } = useWebSocket();
+  
+  // ── Neural States (Optimized with Shallow Registry) ──
+  const {
+    candles,
+    decisions,
+    position,
+    pnl,
+    status,
+    focusedTradeId,
+    activeTab,
+    config,
+    botStatus,
+    symbols,
+    timeframes,
+    configOpen,
+    sidebarExpanded,
+    sidebarPos,
+    isDragging,
+    dragOffset,
+    configError,
+  } = useDashboardStore(useShallow((s) => ({
+    candles: s.candles,
+    decisions: s.decisions,
+    position: s.position,
+    pnl: s.pnl,
+    status: s.status,
+    focusedTradeId: s.focusedTradeId,
+    activeTab: s.activeTab,
+    config: s.config,
+    botStatus: s.botStatus,
+    symbols: s.symbols,
+    timeframes: s.timeframes,
+    configOpen: s.configOpen,
+    sidebarExpanded: s.sidebarExpanded,
+    sidebarPos: s.sidebarPos,
+    isDragging: s.isDragging,
+    dragOffset: s.dragOffset,
+    configError: s.configError,
+  })));
+
+  // ── Neural Actions (Static Execution Pulse) ──
+  const { 
+    setFocusedTradeId,
+    setActiveTab,
+    setCandles,
+    setDecisions,
+    setPosition,
+    setStatus,
+    setConfig,
+    setBotStatus,
+    setSymbols,
+    setTimeframes,
+    setConfigOpen,
+    setSidebarExpanded,
+    setSidebarPos,
+    setIsDragging,
+    setDragOffset,
+    setConfigError
+  } = useDashboardStore();
 
   const onMouseDown = (e: React.MouseEvent) => {
     if (!(e.target as HTMLElement).closest(".drag-handle")) return;
@@ -115,13 +161,6 @@ export function Dashboard() {
     }
   };
 
-  // Auto-expand sidebar when a trade is detected
-  useEffect(() => {
-    if (position && !sidebarExpanded) {
-      setSidebarExpanded(true);
-    }
-  }, [position]);
-
   const handleStart = async () => {
     try {
       await botAPI.start();
@@ -143,9 +182,7 @@ export function Dashboard() {
   const handleReset = async () => {
     try {
       await botAPI.reset();
-      setCandles([]);
-      setDecisions([]);
-      setPnl({ total_pnl: 0, win_rate: 0, balance: 10000 });
+      useDashboardStore.getState().reset();
       await loadBotStatus();
     } catch (error) {
       console.error("Failed to reset bot:", error);
@@ -164,6 +201,11 @@ export function Dashboard() {
     }
   };
 
+  const isActive = (link: string) => {
+    if (link === pathname.split("/")[1]) return true;
+    return false;
+  };
+
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-dark-core font-sans selection:bg-emerald-500/30">
       <header className="z-50 shrink-0 border-b border-white/5 bg-dark-core backdrop-blur-xl">
@@ -176,27 +218,36 @@ export function Dashboard() {
               <Logo className="h-5 w-5 text-white" />
             </Link>
 
-            <nav className="hidden items-center gap-2 rounded-lg bg-white/5 p-1 md:flex">
+            <nav className="hidden items-center gap-1 rounded-lg bg-white/5 p-1 md:flex">
               <Link to="/dashboard">
                 <Button
                   variant="ghost"
-                  className="h-7 px-3 text-[11px] font-bold text-white transition-all hover:bg-white/10 hover:text-white"
+                  className={cn(
+                    "h-7 px-3 text-[11px] font-bold transition-all hover:bg-white/10 hover:text-white",
+                    isActive("dashboard") ? "bg-white/10 text-white" : "text-white/60"
+                  )}
                 >
                   Dashboard
                 </Button>
               </Link>
-              <Link to="/api">
+              <Link to="/backtest">
                 <Button
                   variant="ghost"
-                  className="h-7 px-3 text-[11px] font-bold text-white/60 transition-all hover:bg-white/10 hover:text-white"
+                  className={cn(
+                    "h-7 px-3 text-[11px] font-bold transition-all hover:bg-white/10 hover:text-white",
+                    isActive("backtest") ? "bg-white/10 text-white" : "text-white/60"
+                  )}
                 >
-                  API
+                  Backtest
                 </Button>
               </Link>
               <Link to="/docs">
                 <Button
                   variant="ghost"
-                  className="h-7 px-3 text-[11px] font-bold text-white/60 transition-all hover:bg-white/10 hover:text-white"
+                  className={cn(
+                    "h-7 px-3 text-[11px] font-bold transition-all hover:bg-white/10 hover:text-white",
+                    isActive("docs") ? "bg-white/10 text-white" : "text-white/60"
+                  )}
                 >
                   Docs
                 </Button>
@@ -374,7 +425,7 @@ export function Dashboard() {
                     size="sm"
                     className="group relative flex h-9 gap-2 overflow-hidden border border-blue-500/20 bg-blue-500/10 px-5 text-[11px] font-semibold text-blue-400 transition-all hover:bg-blue-500/20"
                   >
-                    <span className="relative z-10">JUMP TO ACTION</span>
+                    <span className="relative z-10">SKIP</span>
                     <div className="absolute inset-0 z-0 bg-blue-500/5 group-hover:animate-pulse"></div>
                   </Button>
                   <Button
@@ -390,9 +441,9 @@ export function Dashboard() {
                   <Button
                     onClick={handleStart}
                     size="sm"
-                    className="h-9 gap-2 border border-emerald-500/20 bg-emerald-500 px-6 text-[11px] font-semibold text-white shadow-lg transition-all hover:bg-emerald-600 active:scale-95"
+                    className={`h-9 gap-2 border ${botStatus?.paused ? "border-neutral-200/20 bg-neutral-200 text-neutral-900 hover:bg-neutral-300" : "border-emerald-500/20 bg-emerald-500 text-white hover:bg-emerald-600"} px-6 text-[11px] font-semibold shadow-lg transition-all active:scale-95`}
                   >
-                    START
+                    {botStatus?.paused ? "PLAY" : "START"}
                   </Button>
                   <Button
                     onClick={handleReset}
@@ -460,121 +511,54 @@ export function Dashboard() {
               )}
             </Button>
 
+            <div className="flex border-b border-white/5 bg-white/2">
+              <button
+                onClick={() => setActiveTab("live")}
+                className={`flex-1 px-4 py-2 text-[10px] font-bold tracking-widest transition-all ${activeTab === "live" ? "border-b border-emerald-500 text-emerald-400" : "text-gray-500 hover:text-white"}`}
+              >
+                {focusedTradeId ? "AUDIT" : "LIVE"}
+              </button>
+              <button
+                onClick={() => setActiveTab("history")}
+                className={`flex-1 px-4 py-2 text-[10px] font-bold tracking-widest transition-all ${activeTab === "history" ? "border-b border-blue-500 text-blue-400" : "text-gray-500 hover:text-white"}`}
+              >
+                HISTORY
+              </button>
+            </div>
+
             {sidebarExpanded && (
               <div className="max-h-[80vh] overflow-x-hidden overflow-y-auto p-4 pt-2">
-                {/* Active Risk Unit */}
-                <div className="mb-8 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-[10px] font-semibold tracking-widest text-emerald-500 uppercase">
-                      Live Exposure
-                    </h3>
-                    <Badge
-                      variant="outline"
-                      className="h-5 border-white/10 bg-white/5 text-[9px] font-bold text-gray-400"
-                    >
-                      Position ID: 001
-                    </Badge>
-                  </div>
-                  {position ? (
-                    <div className="group relative space-y-3 overflow-hidden rounded-xl border border-white/5 bg-white/2 p-4 transition-all hover:bg-white/5">
-                      <div className="flex items-end justify-between">
-                        <span className="text-[9px] font-bold text-gray-500 uppercase">Direction</span>
-                        <span
-                          className={`text-xs font-semibold ${position.side === "buy" ? "text-emerald-400" : "text-red-400"}`}
+                {activeTab === "live" ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-[10px] font-semibold tracking-widest text-emerald-500 uppercase">
+                        {focusedTradeId ? "Trade Audit" : "Live Exposure"}
+                      </h3>
+                      {focusedTradeId && (
+                        <button
+                          onClick={() => setFocusedTradeId(null)}
+                          className="text-[9px] font-bold text-blue-400 hover:underline"
                         >
-                          {position.side.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex items-end justify-between">
-                        <span className="text-[9px] font-bold text-gray-500 uppercase">Entry Quote</span>
-                        <span className="font-mono text-xs font-bold text-white">
-                          ${position.entry_price.toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="pt-2">
-                        <div className="mb-1.5 flex items-center justify-between">
-                          <span className="text-[9px] font-semibold text-gray-500 uppercase">Profit Tracker</span>
-                          <span
-                            className={`font-mono text-xs font-semibold ${position.unrealized_pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
-                          >
-                            {position.unrealized_pnl >= 0 ? "+" : ""}
-                            {position.unrealized_pnl.toFixed(4)}
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
-                          <div
-                            className={`h-full transition-all duration-700 ${position.unrealized_pnl >= 0 ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"}`}
-                            style={{ width: `${Math.min(100, Math.max(0, 50 + position.unrealized_pnl * 10))}%` }}
-                          />
-                        </div>
-                      </div>
+                          LATEST
+                        </button>
+                      )}
                     </div>
-                  ) : (
-                    <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/2">
-                      <span className="text-[10px] font-semibold tracking-widest text-gray-600">
-                        NO ACTIVE EXPOSURE
-                      </span>
-                    </div>
-                  )}
-                </div>
 
-                {/* Tactical Pulse Unit */}
-                <div className="space-y-4">
-                  <h3 className="text-[10px] font-semibold tracking-widest text-blue-500 uppercase">Decision Stream</h3>
-                  {decisions.length > 0 ? (
-                    <div className="space-y-4">
-                      <div className="rounded-xl border border-white/5 bg-white/2 p-4">
-                        <div className="mb-3 flex items-center justify-between border-b border-white/5 pb-2">
-                          <span className="text-[9px] font-bold tracking-tighter text-gray-500 uppercase">
-                            Current Sentiment
-                          </span>
-                          <span
-                            className={`rounded px-2 py-0.5 text-[9px] font-semibold tracking-widest uppercase ${
-                              decisions[decisions.length - 1].signal === "buy"
-                                ? "bg-emerald-500/20 text-emerald-400"
-                                : decisions[decisions.length - 1].signal === "sell"
-                                  ? "bg-red-500/20 text-red-400"
-                                  : "bg-white/10 text-gray-400"
-                            }`}
-                          >
-                            {decisions[decisions.length - 1].signal}
-                          </span>
-                        </div>
-                        <p className="text-[10px] leading-relaxed text-gray-400">
-                          "{decisions[decisions.length - 1].reasoning}"
-                        </p>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        {decisions
-                          .slice(-3)
-                          .reverse()
-                          .map((d, i) => (
-                            <div
-                              key={i}
-                              className="flex items-center justify-between rounded-lg border border-transparent bg-white/2 px-3 py-1.5 transition-all hover:border-white/5"
-                            >
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className={`h-1 w-1 rounded-full ${d.signal === "buy" ? "bg-emerald-500" : d.signal === "sell" ? "bg-red-500" : "bg-gray-500"}`}
-                                />
-                                <span className="text-[9px] font-bold text-gray-400">
-                                  {new Date(d.timestamp).toLocaleTimeString()}
-                                </span>
-                              </div>
-                              <span className="text-[10px] font-semibold tracking-tighter text-white uppercase">
-                                {d.signal}
-                              </span>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex h-20 items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/2">
-                      <span className="text-[10px] font-semibold tracking-widest text-gray-600">LISTENING...</span>
-                    </div>
-                  )}
-                </div>
+                    {/* Trade Details (Focused or Active) */}
+                    <PositionDetails position={position} focusedTradeId={focusedTradeId} trades={pnl?.trades || []} />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <h3 className="text-[10px] font-semibold tracking-widest text-blue-500 uppercase">Trade History</h3>
+                    <HistoryList
+                      trades={pnl?.trades || []}
+                      onAudit={(id) => {
+                        setFocusedTradeId(id);
+                        setActiveTab("live");
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -632,6 +616,129 @@ export function Dashboard() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+function PositionDetails({
+  position,
+  focusedTradeId,
+  trades,
+}: {
+  position: any;
+  focusedTradeId: string | null;
+  trades: any[];
+}) {
+  const trade = focusedTradeId ? trades.find((t: any) => t.id === focusedTradeId) : position;
+
+  if (!trade) {
+    return (
+      <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/2">
+        <span className="text-[10px] font-semibold tracking-widest text-gray-600 uppercase">
+          Listening for Neural Signal...
+        </span>
+      </div>
+    );
+  }
+
+  const isBuy = trade.side?.toLowerCase() === "buy" || trade.side?.toLowerCase() === "long";
+
+  return (
+    <div className="group relative space-y-3 overflow-hidden rounded-xl border border-white/5 bg-white/2 p-4 transition-all hover:bg-white/5">
+      <div className="flex items-end justify-between">
+        <span className="text-[9px] font-bold text-gray-500 uppercase">Vector</span>
+        <span className={`text-xs font-semibold ${isBuy ? "text-emerald-400" : "text-red-400"}`}>
+          {trade.side?.toUpperCase()}
+        </span>
+      </div>
+      <div className="flex items-end justify-between">
+        <span className="text-[9px] font-bold text-gray-500 uppercase">Entry Quote</span>
+        <span className="font-mono text-xs font-bold text-white">${(trade.entry_price || 0).toFixed(4)}</span>
+      </div>
+      <div className="flex items-end justify-between">
+        <span className="text-[9px] font-bold text-gray-500 uppercase">Target (TP)</span>
+        <span className="font-mono text-xs font-bold text-emerald-400">${(trade.take_profit || 0).toFixed(4)}</span>
+      </div>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-end justify-between">
+          <span className="text-[9px] font-bold text-gray-500 uppercase">Neural SL</span>
+          <span className={`font-mono text-xs font-bold ${trade.trailing_sl ? "text-blue-400" : "text-red-400"}`}>
+            ${(trade.trailing_sl || trade.stop_loss || 0).toFixed(4)}
+          </span>
+        </div>
+        {trade.trailing_sl && (
+          <div className="flex justify-end">
+            <span className="text-[8px] font-black tracking-tighter text-blue-500 uppercase">
+              Shield Locked (Modified)
+            </span>
+          </div>
+        )}
+      </div>
+
+      {focusedTradeId || trade.closed_at ? (
+        <div className="mt-2 border-t border-white/5 pt-2">
+          <span className="text-[9px] font-bold text-gray-500 uppercase">Realized Result</span>
+          <p className={`text-xs font-black ${trade.realized_pnl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+            {trade.realized_pnl >= 0 ? "PROFIT" : "LOSS"} | {trade.realized_pnl?.toFixed(4)}
+          </p>
+        </div>
+      ) : (
+        <div className="pt-2">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-[9px] font-semibold text-gray-500 uppercase">Profit Tracker</span>
+            <span
+              className={`font-mono text-xs font-semibold ${trade.unrealized_pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
+            >
+              {trade.unrealized_pnl >= 0 ? "+" : ""}
+              {trade.unrealized_pnl?.toFixed(4)}
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+            <div
+              className={`h-full transition-all duration-700 ${trade.unrealized_pnl >= 0 ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"}`}
+              style={{ width: `${Math.min(100, Math.max(0, 50 + trade.unrealized_pnl * 10))}%` }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HistoryList({ trades, onAudit }: { trades: any[]; onAudit: (id: string) => void }) {
+  return (
+    <div className="flex flex-col gap-1">
+      {trades.length === 0 ? (
+        <div className="flex h-20 items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/2">
+          <span className="text-[10px] font-semibold tracking-widest text-gray-600 uppercase italic">
+            History empty
+          </span>
+        </div>
+      ) : (
+        trades
+          .slice()
+          .reverse()
+          .map((t, i) => (
+            <button
+              key={i}
+              onClick={() => onAudit(t.id)}
+              className="flex items-center justify-between rounded-lg border border-transparent bg-white/2 px-3 py-2 text-left transition-all hover:border-white/5 hover:bg-white/5"
+            >
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[9px] font-bold text-gray-400 italic">
+                  {new Date(t.opened_at).toLocaleTimeString()}
+                </span>
+                <span className="text-[10px] font-black text-white uppercase">{t.side?.toUpperCase()}</span>
+              </div>
+              <div className="text-right">
+                <span className={`text-[10px] font-black ${t.realized_pnl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                  {t.realized_pnl >= 0 ? "+" : ""}
+                  {t.realized_pnl.toFixed(4)}
+                </span>
+              </div>
+            </button>
+          ))
+      )}
     </div>
   );
 }

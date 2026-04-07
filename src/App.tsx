@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Header } from "./components/layout/Header";
+import Backtest from "./pages/Backtest";
 import { Home } from "./pages/Home";
 import { Dashboard } from "./pages/Dashboard";
 import LabIndex from "./pages/lab/Index";
@@ -25,6 +26,7 @@ function App() {
           </Route>
           
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/backtest" element={<Backtest />} />
         </Routes>
       </BrowserRouter>
     </div>

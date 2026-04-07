@@ -7,6 +7,8 @@ export interface BotConfig {
   replay_mode: boolean;
   dry_run?: boolean;
   replay_speed?: number;
+  start_time?: number;
+  end_time?: number;
   strategy_params?: Record<string, any>;
 }
 
@@ -66,6 +68,12 @@ export const botAPI = {
 
   async getTrades() {
     const res = await fetch(`${API_BASE}/bot/trades`);
+    return res.json();
+  },
+  
+  async getPnL() {
+    const res = await fetch(`${API_BASE}/bot/pnl`);
+    if (!res.ok) throw new Error('Failed to fetch PnL');
     return res.json();
   },
 
