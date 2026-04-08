@@ -1,15 +1,15 @@
 import { create } from "zustand";
-import { 
-  CandleSchema, 
-  PositionSchema, 
-  PnLSchema, 
-  DecisionSchema, 
+import {
+  CandleSchema,
+  PositionSchema,
+  PnLSchema,
+  DecisionSchema,
   BotConfigSchema,
   type CandleData,
   type Decision,
   type Position,
   type PnLData,
-  type BotConfig
+  type BotConfig,
 } from "@/types/schemas";
 
 // ── Store Definition ──
@@ -22,7 +22,7 @@ interface DashboardState {
   status: string;
   focusedTradeId: string | null;
   activeTab: "live" | "history";
-  
+
   // ── Engine Metadata ──
   config: BotConfig;
   botStatus: any;
@@ -49,7 +49,7 @@ interface DashboardState {
   setBotStatus: (status: any) => void;
   setSymbols: (symbols: string[]) => void;
   setTimeframes: (timeframes: string[]) => void;
-  
+
   // UI Actions
   setConfigOpen: (open: boolean) => void;
   setSidebarExpanded: (expanded: boolean) => void;
@@ -57,7 +57,7 @@ interface DashboardState {
   setIsDragging: (dragging: boolean) => void;
   setDragOffset: (offset: { x: number; y: number }) => void;
   setConfigError: (error: string | null) => void;
-  
+
   reset: () => void;
 }
 
@@ -69,7 +69,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   status: "disconnected",
   focusedTradeId: null,
   activeTab: "live",
-  
+
   config: {
     symbol: "sol",
     timeframe: "1h",
@@ -91,18 +91,24 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   configError: null,
 
   setCandles: (data) => {
-    const parsedArr = data.map(c => CandleSchema.safeParse(c)).filter(p => p.success).map(p => p.data!);
+    const parsedArr = data
+      .map((c) => CandleSchema.safeParse(c))
+      .filter((p) => p.success)
+      .map((p) => p.data!);
     if (parsedArr.length === 0) return;
-    set((state) => ({ 
+    set((state) => ({
       candles: [...state.candles, ...parsedArr]
         .filter((c, i, self) => i === self.findIndex((t) => t.timestamp === c.timestamp))
-        .sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-        .slice(-1000)
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+        .slice(-1000),
     }));
   },
 
   setDecisions: (data) => {
-    const parsedArr = data.map(d => DecisionSchema.safeParse(d)).filter(p => p.success).map(p => p.data!);
+    const parsedArr = data
+      .map((d) => DecisionSchema.safeParse(d))
+      .filter((p) => p.success)
+      .map((p) => p.data!);
     if (parsedArr.length === 0) return;
     set((state) => ({ decisions: [...state.decisions, ...parsedArr] }));
   },
@@ -130,11 +136,12 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   setFocusedTradeId: (id) => set({ focusedTradeId: id }),
   setActiveTab: (tab) => set({ activeTab: tab }),
 
-  setConfig: (newConfig) => set((state) => {
-    const merged = { ...state.config, ...newConfig };
-    const parsed = BotConfigSchema.safeParse(merged);
-    return parsed.success ? { config: parsed.data } : state;
-  }),
+  setConfig: (newConfig) =>
+    set((state) => {
+      const merged = { ...state.config, ...newConfig };
+      const parsed = BotConfigSchema.safeParse(merged);
+      return parsed.success ? { config: parsed.data } : state;
+    }),
 
   setBotStatus: (botStatus) => set({ botStatus }),
   setSymbols: (symbols) => set({ symbols }),
@@ -148,12 +155,13 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   setDragOffset: (dragOffset) => set({ dragOffset }),
   setConfigError: (configError) => set({ configError }),
 
-  reset: () => set({ 
-    candles: [], 
-    decisions: [],
-    position: null, 
-    pnl: null, 
-    focusedTradeId: null,
-    activeTab: "live"
-  }),
+  reset: () =>
+    set({
+      candles: [],
+      decisions: [],
+      position: null,
+      pnl: null,
+      focusedTradeId: null,
+      activeTab: "live",
+    }),
 }));

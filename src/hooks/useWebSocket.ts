@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { WSEvent, CandleData, Decision, Position, PnLData } from '@/types/trading';
+import type { WSEvent } from '@/types/trading';
 import { useDashboardStore } from "@/zustand";
 
 interface UseWebSocketReturn {
@@ -76,8 +76,8 @@ export function useWebSocket(): UseWebSocketReturn {
 
             case 'status':
               setStatus(wsEvent.data.status);
-              // Clean reset for fresh starts
-              if (wsEvent.data.status === 'started' || wsEvent.data.status === 'reset') {
+              // Only reset on explicit engine reset signals, not every time it starts
+              if (wsEvent.data.status === 'reset') {
                  useDashboardStore.getState().reset();
               }
               break;

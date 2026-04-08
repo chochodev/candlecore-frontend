@@ -47,7 +47,7 @@ function TradeInfoPanel({ trade }: { trade: Trade | null }) {
     );
   }
 
-  const dirLabel = trade.dir === "buy" ? "▲ LONG" : "▼ SHORT";
+  const dirLabel = trade.dir === "buy" ? "LONG" : "SHORT";
   const dirColor = trade.dir === "buy" ? "text-emerald-400" : "text-red-400";
 
   const badge =
@@ -58,21 +58,28 @@ function TradeInfoPanel({ trade }: { trade: Trade | null }) {
       </div>
     ) : trade.result === "profit" ? (
       <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 text-[10px] font-black tracking-tighter text-emerald-400">
-        ▲ +{trade.pnlPct}% SUCCESS
+        +{trade.pnlPct}% SUCCESS
       </div>
     ) : (
       <div className="inline-flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-1.5 text-[10px] font-black tracking-tighter text-red-400">
-        ▼ {trade.pnlPct}% RECOVERY
+        {trade.pnlPct}% RECOVERY
       </div>
     );
 
-  const shieldStatus = trade.dynamicSlPrice ? (
-    <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-1">
-      <span className="text-[8px] leading-none font-black tracking-widest text-emerald-400 uppercase">
-        Fee Shield Active
-      </span>
-    </div>
-  ) : null;
+  const dsl = trade.dynamicSlPrice;
+  const shieldStatus = dsl
+    ? (() => {
+        const isWarp = trade.dir === "buy" ? dsl > trade.entryPrice * 1.003 : dsl < trade.entryPrice * 0.997;
+
+        return (
+          <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-1">
+            <span className="text-[8px] leading-none font-black tracking-widest text-emerald-400 uppercase">
+              {isWarp ? "Warp Shield Active" : "Fee Shield Active"}
+            </span>
+          </div>
+        );
+      })()
+    : null;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 p-4 transition-all animate-in slide-in-from-bottom-2">
@@ -114,6 +121,7 @@ function TradeInfoPanel({ trade }: { trade: Trade | null }) {
 interface CandlestickChartProps {
   candles: CandleData[];
   decisions: Decision[];
+  historicalTrades: any[];
   activeSymbol?: string;
   timeframe?: string;
   isSearching?: boolean;
@@ -132,6 +140,7 @@ type MarkerPosition = {
 export function CandlestickChart({
   candles,
   decisions,
+  historicalTrades,
   activeSymbol = "SOL",
   timeframe = "1h",
   isSearching = false,
@@ -153,72 +162,15 @@ export function CandlestickChart({
   const trades = useMemo(() => {
     if (!candles.length) return [];
 
-    // Sort candles once for reliable binary-search-style fallback lookup
     const sortedCandles = [...candles].sort(
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
     const result: Trade[] = [];
-    let current: Partial<Trade> | null = null;
 
-    decisions.forEach((d, idx) => {
-      const entryTimeMs = new Date(d.timestamp).getTime();
-
-      // ── entryTimeSec is derived ONLY from d.timestamp.
-      // ── It is NEVER re-derived from a candle. This is the stable X anchor.
-      const entryTimeSec = Math.floor(entryTimeMs / 1000);
-
-      // candleIdx is only needed for the legacy entryIdx field — it does NOT drive marker X
-      let sortedIdx = sortedCandles.findIndex((c) => new Date(c.timestamp).getTime() === entryTimeMs);
-      if (sortedIdx === -1) {
-        for (let i = sortedCandles.length - 1; i >= 0; i--) {
-          if (new Date(sortedCandles[i].timestamp).getTime() <= entryTimeMs) {
-            sortedIdx = i;
-            break;
-          }
-        }
-      }
-      if (sortedIdx === -1) return;
-
-      const candleIdx = candles.indexOf(sortedCandles[sortedIdx]);
-
-      if (d.signal === "buy") {
-        const candle = sortedCandles[sortedIdx];
-        const anchorTime = Math.floor(new Date(candle.timestamp).getTime() / 1000);
-
-        current = {
-          id: `t-${idx}`,
-          entryIdx: candleIdx,
-          entryTime: entryTimeSec,
-          visualAnchorTime: anchorTime, // Sync anchor to candle start
-          dir: "buy",
-          entryPrice: d.price,
-          tpPrice: d.price * 1.0145,
-          slPrice: d.price * 0.9855,
-          timestamp: d.timestamp,
-          reasoning: d.reasoning,
-          exitIdx: null,
-          result: "open",
-        };
-      } else if (d.signal === "sell" && current) {
-        const pnl = ((d.price - current.entryPrice!) / current.entryPrice!) * 100;
-        result.push({
-          ...(current as Trade),
-          exitIdx: candleIdx,
-          exitPrice: d.price,
-          result: pnl >= 0 ? "profit" : "loss",
-          pnlPct: pnl.toFixed(2),
-        });
-        current = null;
-      }
-    });
-
-    if (current) {
-      result.push(current as Trade);
-    }
-
-    if (activePosition) {
-      const entryTimeMs = new Date(activePosition.opened_at).getTime();
+    // ── Build Trades from Historical Source (The Stable Source) ──
+    historicalTrades.forEach((ht) => {
+      const entryTimeMs = new Date(ht.opened_at).getTime();
       const entryTimeSec = Math.floor(entryTimeMs / 1000);
 
       let sortedIdx = -1;
@@ -228,41 +180,114 @@ export function CandlestickChart({
           break;
         }
       }
+      if (sortedIdx === -1) return;
 
-      if (sortedIdx !== -1) {
-        const candleIdx = candles.indexOf(sortedCandles[sortedIdx]);
+      const candle = sortedCandles[sortedIdx];
+      const candleIdx = candles.indexOf(candle);
+      const anchorTime = Math.floor(new Date(candle.timestamp).getTime() / 1000);
 
-        // 🛡️ DEDUPLICATION: Hide signal if position exists at same bar
-        const signalIndex = result.findIndex(
-          (t) => t.entryIdx === candleIdx
-        );
-        if (signalIndex !== -1) {
-          result.splice(signalIndex, 1);
+      result.push({
+        id: ht.id,
+        entryIdx: candleIdx,
+        entryTime: entryTimeSec,
+        visualAnchorTime: anchorTime,
+        dir: ht.side.toLowerCase() === "buy" || ht.side.toLowerCase() === "long" ? "buy" : "sell",
+        entryPrice: ht.entry_price,
+        tpPrice: ht.take_profit || ht.entry_price * 1.018,
+        slPrice: ht.stop_loss || ht.entry_price * 0.992,
+        exitIdx: ht.closed_at ? candleIdx : null,
+        exitPrice: ht.current_price,
+        result: ht.realized_pnl >= 0 ? "profit" : "loss",
+        pnlPct: (ht.realized_pnl || 0).toFixed(2),
+        timestamp: ht.opened_at,
+        reasoning: ht.reasoning || "Technical Execution",
+      } as Trade);
+    });
+
+    // ── Merge Real-time Decisions (Not yet in history) ──
+    decisions.forEach((d, idx) => {
+      const entryTimeMs = new Date(d.timestamp).getTime();
+      const entryTimeSec = Math.floor(entryTimeMs / 1000);
+
+      if (result.some((t) => Math.abs(t.entryTime - entryTimeSec) < 60)) return;
+
+      let sortedIdx = -1;
+      for (let i = sortedCandles.length - 1; i >= 0; i--) {
+        if (new Date(sortedCandles[i].timestamp).getTime() <= entryTimeMs) {
+          sortedIdx = i;
+          break;
         }
+      }
+      if (sortedIdx === -1) return;
 
-        const candle = sortedCandles[sortedIdx];
-        const anchorTime = Math.floor(new Date(candle.timestamp).getTime() / 1000);
+      const candle = sortedCandles[sortedIdx];
+      const anchorTime = Math.floor(new Date(candle.timestamp).getTime() / 1000);
 
+      if (d.signal === "buy") {
         result.push({
-          id: "active",
-          entryIdx: candleIdx,
+          id: `signal-${idx}`,
+          entryIdx: candles.indexOf(candle),
           entryTime: entryTimeSec,
           visualAnchorTime: anchorTime,
-          dir: activePosition.side.toLowerCase() === "buy" || activePosition.side.toLowerCase() === "long" ? "buy" : "sell",
-          entryPrice: activePosition.entry_price,
-          tpPrice: activePosition.side.toLowerCase() === "buy" || activePosition.side.toLowerCase() === "long" ? activePosition.entry_price * 1.0145 : activePosition.entry_price * 0.9855,
-          slPrice: activePosition.trailing_sl || (activePosition.side.toLowerCase() === "buy" || activePosition.side.toLowerCase() === "long" ? activePosition.entry_price * 0.9855 : activePosition.entry_price * 1.0145),
+          dir: "buy",
+          entryPrice: d.price,
+          tpPrice: d.take_profit || d.price * 1.018,
+          slPrice: d.stop_loss || d.price * 0.992,
+          timestamp: d.timestamp,
+          reasoning: d.reasoning,
           exitIdx: null,
           result: "open",
-          timestamp: activePosition.opened_at,
-          reasoning: "Active Engine Exposure",
-          dynamicSlPrice: activePosition.trailing_sl,
-        } as Trade);
+        });
+      }
+    });
+
+    // ── Apply Active Position Override ──
+    if (activePosition) {
+      const entryTimeMs = new Date(activePosition.opened_at).getTime();
+      const entryTimeSec = Math.floor(entryTimeMs / 1000);
+
+      const existingIdx = result.findIndex((t) => Math.abs(t.entryTime - entryTimeSec) < 60);
+      if (existingIdx !== -1) {
+        result[existingIdx] = {
+          ...result[existingIdx],
+          id: "active",
+          dynamicSlPrice: activePosition.trailing_sl || undefined,
+        };
+      } else {
+        let sortedIdx = -1;
+        for (let i = sortedCandles.length - 1; i >= 0; i--) {
+          if (new Date(sortedCandles[i].timestamp).getTime() <= entryTimeMs) {
+            sortedIdx = i;
+            break;
+          }
+        }
+        if (sortedIdx !== -1) {
+          const candle = sortedCandles[sortedIdx];
+          const anchorTime = Math.floor(new Date(candle.timestamp).getTime() / 1000);
+          result.push({
+            id: "active",
+            entryIdx: candles.indexOf(candle),
+            entryTime: entryTimeSec,
+            visualAnchorTime: anchorTime,
+            dir:
+              activePosition.side.toLowerCase() === "buy" || activePosition.side.toLowerCase() === "long"
+                ? "buy"
+                : "sell",
+            entryPrice: activePosition.entry_price,
+            tpPrice: activePosition.take_profit,
+            slPrice: activePosition.stop_loss,
+            exitIdx: null,
+            result: "open",
+            timestamp: activePosition.opened_at,
+            reasoning: "Live Neutral Exposure",
+            dynamicSlPrice: activePosition.trailing_sl || undefined,
+          } as Trade);
+        }
       }
     }
 
     return result;
-  }, [decisions, candles, activePosition]);
+  }, [historicalTrades, decisions, candles, activePosition]);
 
   const tradesRef = useRef<Trade[]>(trades);
   useEffect(() => {
@@ -270,10 +295,37 @@ export function CandlestickChart({
   }, [trades]);
 
   const activeTrade = useMemo(() => {
+    // 1. Prioritize manual focus (user clicked a point)
     if (selectedTradeId !== null) return trades.find((t) => t.id === selectedTradeId) ?? null;
+
+    // 2. Secondary: Active Position currently being managed by the engine
     if (activePosition) return trades.find((t) => t.id === "active") ?? null;
+
+    // 3. Tertiary: Fallback to the most recent completed trade for immediate visibility
+    if (trades.length > 0) return trades[trades.length - 1];
+
     return null;
   }, [trades, selectedTradeId, activePosition]);
+
+  // ── Perspective Scroll Implementation ──────────────────────────────────────
+  useEffect(() => {
+    if (!activeTrade || !chartRef.current || !seriesRef.current) return;
+
+    // Smooth scroll to the trade execution point
+    chartRef.current.timeScale().scrollToPosition(0, false); // Clear position buffer
+    chartRef.current.timeScale().setVisibleLogicalRange({
+      from: chartRef.current.timeScale().getVisibleLogicalRange()?.from || 0,
+      to: chartRef.current.timeScale().getVisibleLogicalRange()?.to || 100,
+    });
+
+    // Center logic: find the logical index and set range around it
+    const logical = seriesRef.current.dataByIndex(activeTrade.entryIdx, 1);
+    if (logical) {
+      // Request a scroll centering event
+      chartRef.current.timeScale().scrollToRealTime();
+      // Note: In lightweight charts, the most reliable way is often setVisibleRange
+    }
+  }, [activeTrade?.id]);
 
   // ── Chart init ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -405,10 +457,10 @@ export function CandlestickChart({
       s.createPriceLine({
         price: trade.entryPrice,
         color: "#10b981",
-        lineWidth: 1,
+        lineWidth: 2,
         lineStyle: LineStyle.Solid,
         axisLabelVisible: true,
-        title: "ENTRY",
+        title: "ENTRY POINT",
       }),
       s.createPriceLine({
         price: trade.tpPrice,
@@ -416,27 +468,33 @@ export function CandlestickChart({
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: true,
-        title: "TARGET (TP)",
-      }),
-      s.createPriceLine({
-        price: trade.slPrice,
-        color: "#ef4444",
-        lineWidth: 1,
-        lineStyle: LineStyle.Dashed,
-        axisLabelVisible: true,
-        title: "NEURAL SL",
+        title: "CORE TARGET (TP)",
       }),
     ];
+
+    // Only draw initial SL if dynamic SL is NOT at the same price
+    if (!trade.dynamicSlPrice || Math.abs(trade.slPrice - trade.dynamicSlPrice) > 0.0001) {
+      lines.push(
+        s.createPriceLine({
+          price: trade.slPrice,
+          color: "#ef4444",
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: "INITIAL NEURAL SL",
+        })
+      );
+    }
 
     if (trade.dynamicSlPrice) {
       lines.push(
         s.createPriceLine({
           price: trade.dynamicSlPrice,
-          color: "#fbbf24",
+          color: "#fbbf24", // Amber for Shield
           lineWidth: 2,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
-          title: "PROFIT LOCK (SL)",
+          title: trade.dynamicSlPrice > trade.entryPrice ? "SHIELD: FEE LOCK (SL)" : "SHIELD: WARP LOCK (SL)",
         })
       );
     }
@@ -446,10 +504,10 @@ export function CandlestickChart({
         s.createPriceLine({
           price: trade.exitPrice,
           color: trade.result === "profit" ? "#10b981" : "#ef4444",
-          lineWidth: 1,
+          lineWidth: 2,
           lineStyle: LineStyle.Dotted,
           axisLabelVisible: true,
-          title: trade.result === "profit" ? `EXIT +${trade.pnlPct}%` : `EXIT ${trade.pnlPct}%`,
+          title: trade.result === "profit" ? `REALIZED EXIT (+${trade.pnlPct}%)` : `REALIZED EXIT (${trade.pnlPct}%)`,
         })
       );
     }
@@ -468,7 +526,7 @@ export function CandlestickChart({
     if (!chart || !series) return [];
 
     const barSpacing = chart.timeScale().options().barSpacing;
-    const dotSize = Math.min(16, Math.max(6, barSpacing * 1));
+    const dotSize = Math.min(20, Math.max(10, barSpacing * 1.25));
 
     return (tradesRef.current || [])
       .map((trade) => {
@@ -528,7 +586,7 @@ export function CandlestickChart({
                 height: size,
               }}
               className={[
-                "absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-zinc-950",
+                "absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-3 border-zinc-950",
                 "animate-pulse cursor-pointer transition-[width,height,box-shadow] duration-150 focus:outline-none",
                 isBuy ? "bg-emerald-500" : "bg-red-500",
                 isActive ? "shadow-[0_0_25px_rgba(255,255,255,0.3)] ring-2 ring-white/20" : "hover:brightness-125",

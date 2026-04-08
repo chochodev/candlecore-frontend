@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { botAPI, type BotConfig } from "@/lib/api";
+import { botAPI } from "@/lib/api";
 import { CandlestickChart } from "@/components/CandlestickChart";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -18,13 +18,13 @@ import {
 import { Logo } from "@/components/Logo";
 import "./dashboard.css";
 
-import { useShallow } from 'zustand/shallow';
+import { useShallow } from "zustand/shallow";
 import { useDashboardStore } from "@/zustand";
 
 export function Dashboard() {
   const { pathname } = useLocation();
   const { connect } = useWebSocket();
-  
+
   // ── Neural States (Optimized with Shallow Registry) ──
   const {
     candles,
@@ -44,34 +44,32 @@ export function Dashboard() {
     isDragging,
     dragOffset,
     configError,
-  } = useDashboardStore(useShallow((s) => ({
-    candles: s.candles,
-    decisions: s.decisions,
-    position: s.position,
-    pnl: s.pnl,
-    status: s.status,
-    focusedTradeId: s.focusedTradeId,
-    activeTab: s.activeTab,
-    config: s.config,
-    botStatus: s.botStatus,
-    symbols: s.symbols,
-    timeframes: s.timeframes,
-    configOpen: s.configOpen,
-    sidebarExpanded: s.sidebarExpanded,
-    sidebarPos: s.sidebarPos,
-    isDragging: s.isDragging,
-    dragOffset: s.dragOffset,
-    configError: s.configError,
-  })));
+  } = useDashboardStore(
+    useShallow((s) => ({
+      candles: s.candles,
+      decisions: s.decisions,
+      position: s.position,
+      pnl: s.pnl,
+      status: s.status,
+      focusedTradeId: s.focusedTradeId,
+      activeTab: s.activeTab,
+      config: s.config,
+      botStatus: s.botStatus,
+      symbols: s.symbols,
+      timeframes: s.timeframes,
+      configOpen: s.configOpen,
+      sidebarExpanded: s.sidebarExpanded,
+      sidebarPos: s.sidebarPos,
+      isDragging: s.isDragging,
+      dragOffset: s.dragOffset,
+      configError: s.configError,
+    }))
+  );
 
   // ── Neural Actions (Static Execution Pulse) ──
-  const { 
+  const {
     setFocusedTradeId,
     setActiveTab,
-    setCandles,
-    setDecisions,
-    setPosition,
-    setStatus,
     setConfig,
     setBotStatus,
     setSymbols,
@@ -81,7 +79,7 @@ export function Dashboard() {
     setSidebarPos,
     setIsDragging,
     setDragOffset,
-    setConfigError
+    setConfigError,
   } = useDashboardStore();
 
   const onMouseDown = (e: React.MouseEvent) => {
@@ -266,7 +264,7 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* 📊 REAL-TIME ENGINE STATS */}
+          {/* REAL-TIME ENGINE STATS */}
           <div className="flex items-center gap-10">
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-bold tracking-widest text-gray-600 uppercase">Total PnL</span>
@@ -460,13 +458,14 @@ export function Dashboard() {
         </div>
       </header>
 
-      {/* 🧭 MAIN VIEWPORT AREA */}
+      {/* MAIN VIEWPORT AREA */}
       <main className="relative flex-1 overflow-hidden">
         {/* Full-bleed Immersive Chart */}
         <div className="h-full w-full overflow-hidden bg-dark-core">
           <CandlestickChart
             candles={candles}
             decisions={decisions}
+            historicalTrades={pnl?.trades || []}
             activeSymbol={config.symbol}
             timeframe={config.timeframe}
             isSearching={botStatus?.running && candles.length === 0}
@@ -474,7 +473,7 @@ export function Dashboard() {
           />
         </div>
 
-        {/* 🛸 FLOATING GLASS SIDEBAR (Movable) */}
+        {/* FLOATING GLASS SIDEBAR (Movable) */}
         <div
           onMouseDown={onMouseDown}
           className={`absolute z-40 transition-shadow ${isDragging ? "shadow-glow cursor-grabbing duration-0" : "duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"} ${sidebarExpanded ? "w-[320px]" : "w-[48px]"}`}
@@ -511,23 +510,25 @@ export function Dashboard() {
               )}
             </Button>
 
-            <div className="flex border-b border-white/5 bg-white/2">
-              <button
-                onClick={() => setActiveTab("live")}
-                className={`flex-1 px-4 py-2 text-[10px] font-bold tracking-widest transition-all ${activeTab === "live" ? "border-b border-emerald-500 text-emerald-400" : "text-gray-500 hover:text-white"}`}
-              >
-                {focusedTradeId ? "AUDIT" : "LIVE"}
-              </button>
-              <button
-                onClick={() => setActiveTab("history")}
-                className={`flex-1 px-4 py-2 text-[10px] font-bold tracking-widest transition-all ${activeTab === "history" ? "border-b border-blue-500 text-blue-400" : "text-gray-500 hover:text-white"}`}
-              >
-                HISTORY
-              </button>
-            </div>
+            {sidebarExpanded && (
+              <div className="flex border-b border-white/5 bg-white/2">
+                <button
+                  onClick={() => setActiveTab("live")}
+                  className={`flex-1 px-4 py-2 text-[10px] font-bold tracking-widest transition-all ${activeTab === "live" ? "border-b border-emerald-500 text-emerald-400" : "text-gray-500 hover:text-white"}`}
+                >
+                  {focusedTradeId ? "AUDIT" : "LIVE"}
+                </button>
+                <button
+                  onClick={() => setActiveTab("history")}
+                  className={`flex-1 px-4 py-2 text-[10px] font-bold tracking-widest transition-all ${activeTab === "history" ? "border-b border-blue-500 text-blue-400" : "text-gray-500 hover:text-white"}`}
+                >
+                  HISTORY
+                </button>
+              </div>
+            )}
 
             {sidebarExpanded && (
-              <div className="max-h-[80vh] overflow-x-hidden overflow-y-auto p-4 pt-2">
+              <div className="max-h-[80vh] overflow-x-hidden overflow-y-auto p-1 pt-2">
                 {activeTab === "live" ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -548,23 +549,20 @@ export function Dashboard() {
                     <PositionDetails position={position} focusedTradeId={focusedTradeId} trades={pnl?.trades || []} />
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <h3 className="text-[10px] font-semibold tracking-widest text-blue-500 uppercase">Trade History</h3>
-                    <HistoryList
-                      trades={pnl?.trades || []}
-                      onAudit={(id) => {
-                        setFocusedTradeId(id);
-                        setActiveTab("live");
-                      }}
-                    />
-                  </div>
+                  <HistoryList
+                    trades={pnl?.trades || []}
+                    onAudit={(id) => {
+                      setFocusedTradeId(id);
+                      setActiveTab("live");
+                    }}
+                  />
                 )}
               </div>
             )}
           </div>
         </div>
 
-        {/* 🚀 NEURAL WARP OVERLAY */}
+        {/* NEURAL WARP OVERLAY */}
         {status === "skipping" && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md transition-all animate-in fade-in zoom-in-95">
             <div className="relative max-w-sm rounded-[2.5rem] border border-white/5 bg-linear-to-b from-white/5 to-transparent p-12 text-center shadow-2xl">
