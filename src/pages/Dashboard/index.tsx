@@ -16,6 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Logo } from "@/components/Logo";
+import { Target, LocateFixed } from "lucide-react";
 import "./dashboard.css";
 
 import { useShallow } from "zustand/shallow";
@@ -565,7 +566,7 @@ export function Dashboard() {
         {/* NEURAL WARP OVERLAY */}
         {status === "skipping" && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md transition-all animate-in fade-in zoom-in-95">
-            <div className="relative max-w-sm rounded-[2.5rem] border border-white/5 bg-linear-to-b from-white/5 to-transparent p-12 text-center shadow-2xl">
+            <div className="relative max-w-sm max-h-48 rounded-[2.5rem] border border-white/5 bg-linear-to-b from-white/5 to-transparent p-12 text-center shadow-2xl">
               {/* Glowing Background Glow */}
               <div className="absolute -top-10 -left-10 h-32 w-32 rounded-full bg-emerald-500/10 opacity-50 blur-3xl" />
               <div className="absolute -right-10 -bottom-10 h-16 w-32 rounded-full bg-blue-500/10 opacity-50 blur-3xl" />
@@ -643,11 +644,20 @@ function PositionDetails({
 
   return (
     <div className="group relative space-y-3 overflow-hidden rounded-xl border border-white/5 bg-white/2 p-4 transition-all hover:bg-white/5">
-      <div className="flex items-end justify-between">
-        <span className="text-[9px] font-bold text-gray-500 uppercase">Vector</span>
-        <span className={`text-xs font-semibold ${isBuy ? "text-emerald-400" : "text-red-400"}`}>
-          {trade.side?.toUpperCase()}
-        </span>
+      <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-zinc-500 uppercase">Vector</span>
+          <span className={`text-xs font-semibold ${isBuy ? "text-emerald-400" : "text-red-400"}`}>
+            {trade.side?.toUpperCase()}
+          </span>
+        </div>
+        <button 
+          onClick={() => useDashboardStore.getState().triggerJump()}
+          className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-zinc-500 transition-all hover:bg-emerald-500/20 hover:text-emerald-400 active:scale-90"
+          title="Center Chart"
+        >
+          <Target size={14} strokeWidth={2.5} />
+        </button>
       </div>
       <div className="flex items-end justify-between">
         <span className="text-[9px] font-bold text-gray-500 uppercase">Entry Quote</span>
@@ -728,11 +738,21 @@ function HistoryList({ trades, onAudit }: { trades: any[]; onAudit: (id: string)
                 </span>
                 <span className="text-[10px] font-black text-white uppercase">{t.side?.toUpperCase()}</span>
               </div>
-              <div className="text-right">
+              <div className="flex items-center gap-3 text-right">
                 <span className={`text-[10px] font-black ${t.realized_pnl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
                   {t.realized_pnl >= 0 ? "+" : ""}
                   {t.realized_pnl.toFixed(4)}
                 </span>
+                <button 
+                   onClick={(e) => {
+                     e.stopPropagation();
+                     onAudit(t.id);
+                     useDashboardStore.getState().triggerJump();
+                   }}
+                   className="flex h-6 w-6 items-center justify-center rounded-md border border-white/5 bg-white/2 text-zinc-500 transition-all hover:bg-blue-500/20 hover:text-blue-400 active:scale-90"
+                >
+                   <LocateFixed size={12} strokeWidth={2.5} />
+                </button>
               </div>
             </button>
           ))

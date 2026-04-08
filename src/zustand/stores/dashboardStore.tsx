@@ -58,6 +58,10 @@ interface DashboardState {
   setDragOffset: (offset: { x: number; y: number }) => void;
   setConfigError: (error: string | null) => void;
 
+  // ── Perspective Control ──
+  jumpTrigger: number;
+  triggerJump: () => void;
+
   reset: () => void;
 }
 
@@ -155,6 +159,9 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   setDragOffset: (dragOffset) => set({ dragOffset }),
   setConfigError: (configError) => set({ configError }),
 
+  jumpTrigger: 0,
+  triggerJump: () => set({ jumpTrigger: Date.now() }),
+
   reset: () =>
     set({
       candles: [],
@@ -163,5 +170,6 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       pnl: null,
       focusedTradeId: null,
       activeTab: "live",
+      jumpTrigger: 0,
     }),
 }));

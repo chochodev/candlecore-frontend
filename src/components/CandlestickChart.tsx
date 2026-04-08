@@ -14,6 +14,7 @@ import {
   type Coordinate,
 } from "lightweight-charts";
 import type { CandleData, Decision, Position, Trade } from "@/types/trading";
+import { useDashboardStore } from "@/zustand";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -146,6 +147,7 @@ export function CandlestickChart({
   isSearching = false,
   activePosition,
 }: CandlestickChartProps) {
+  const { focusedTradeId, setFocusedTradeId } = useDashboardStore();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -155,7 +157,6 @@ export function CandlestickChart({
   const hasFittedRef = useRef(false);
   const rafRef = useRef<number>(0);
 
-  const [selectedTradeId, setSelectedTradeId] = useState<string | number | null>(null);
   const [markerPositions, setMarkerPositions] = useState<MarkerPosition[]>([]);
 
   // ── Build trades ────────────────────────────────────────────────────────────
@@ -295,37 +296,39 @@ export function CandlestickChart({
   }, [trades]);
 
   const activeTrade = useMemo(() => {
-    // 1. Prioritize manual focus (user clicked a point)
-    if (selectedTradeId !== null) return trades.find((t) => t.id === selectedTradeId) ?? null;
+    // 1. Prioritize manual focus (user clicked a point or sidebar)
+    if (focusedTradeId !== null) return trades.find((t) => t.id === focusedTradeId) ?? null;
 
     // 2. Secondary: Active Position currently being managed by the engine
     if (activePosition) return trades.find((t) => t.id === "active") ?? null;
 
-    // 3. Tertiary: Fallback to the most recent completed trade for immediate visibility
+    // 3. Tertiary: Fallback to the most recent completed trade
     if (trades.length > 0) return trades[trades.length - 1];
 
     return null;
-  }, [trades, selectedTradeId, activePosition]);
+  }, [trades, focusedTradeId, activePosition]);
 
   // ── Perspective Scroll Implementation ──────────────────────────────────────
+  // ── Perspective Scroll Implementation (Pan-only to preserve Zoom) ───────────
+  const jumpTrigger = useDashboardStore((s) => s.jumpTrigger);
+
   useEffect(() => {
-    if (!activeTrade || !chartRef.current || !seriesRef.current) return;
+    if (!activeTrade || !chartRef.current) return;
 
-    // Smooth scroll to the trade execution point
-    chartRef.current.timeScale().scrollToPosition(0, false); // Clear position buffer
-    chartRef.current.timeScale().setVisibleLogicalRange({
-      from: chartRef.current.timeScale().getVisibleLogicalRange()?.from || 0,
-      to: chartRef.current.timeScale().getVisibleLogicalRange()?.to || 100,
+    const timeScale = chartRef.current.timeScale();
+    const visibleRange = timeScale.getVisibleLogicalRange();
+    if (!visibleRange) return;
+
+    // Center on the entryIdx while preserving zoom level (logical range delta)
+    const currentDelta = visibleRange.to - visibleRange.from;
+    const halfDelta = currentDelta / 2;
+    
+    // We target placing entryIdx at the center of the current viewport
+    timeScale.setVisibleLogicalRange({
+      from: activeTrade.entryIdx - halfDelta,
+      to: activeTrade.entryIdx + halfDelta,
     });
-
-    // Center logic: find the logical index and set range around it
-    const logical = seriesRef.current.dataByIndex(activeTrade.entryIdx, 1);
-    if (logical) {
-      // Request a scroll centering event
-      chartRef.current.timeScale().scrollToRealTime();
-      // Note: In lightweight charts, the most reliable way is often setVisibleRange
-    }
-  }, [activeTrade?.id]);
+  }, [activeTrade?.id, jumpTrigger]);
 
   // ── Chart init ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -578,7 +581,7 @@ export function CandlestickChart({
           return (
             <button
               key={trade.id}
-              onClick={() => setSelectedTradeId((prev) => (prev === trade.id ? null : trade.id))}
+              onClick={() => setFocusedTradeId(focusedTradeId === trade.id ? null : trade.id)}
               style={{
                 left: x,
                 top: y,
