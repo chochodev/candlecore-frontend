@@ -51,22 +51,6 @@ function TradeInfoPanel({ trade }: { trade: Trade | null }) {
   const dirLabel = trade.dir === "buy" ? "LONG" : "SHORT";
   const dirColor = trade.dir === "buy" ? "text-emerald-400" : "text-red-400";
 
-  const badge =
-    trade.result === "open" ? (
-      <div className="inline-flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/10 px-4 py-1.5 text-[10px] font-black tracking-tighter text-blue-400">
-        <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-400" />
-        LIVE EXPOSURE
-      </div>
-    ) : trade.result === "profit" ? (
-      <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 text-[10px] font-black tracking-tighter text-emerald-400">
-        +{trade.pnlPct}% SUCCESS
-      </div>
-    ) : (
-      <div className="inline-flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-1.5 text-[10px] font-black tracking-tighter text-red-400">
-        {trade.pnlPct}% RECOVERY
-      </div>
-    );
-
   const dsl = trade.dynamicSlPrice;
   const shieldStatus = dsl
     ? (() => {
@@ -111,8 +95,23 @@ function TradeInfoPanel({ trade }: { trade: Trade | null }) {
           </div>
         )}
       </div>
-      {shieldStatus}
-      {badge}
+      <div className="flex flex-col items-end gap-2 text-right">
+        {shieldStatus}
+        <div className={`flex flex-col`}>
+            <span className={`text-[12px] font-black tracking-tighter ${dirColor}`}>
+                {trade.result === "open" ? "RUNNING" : trade.result === "profit" ? "PROFIT" : "RECOVERY"}
+            </span>
+            <div className="flex items-center justify-end gap-2 font-mono text-[9px] font-bold">
+                <span className={trade.result === "profit" ? "text-emerald-500" : "text-red-500"}>
+                    {trade.result === "profit" ? "+" : ""}{trade.pnlPct}%
+                </span>
+                <span className="text-zinc-600">/</span>
+                <span className="text-zinc-400">
+                    ${trade.realizedPnl || "0.00"}
+                </span>
+            </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -199,7 +198,8 @@ export function CandlestickChart({
         exitIdx: ht.closed_at ? candleIdx : null,
         exitPrice: ht.current_price,
         result: ht.realized_pnl >= 0 ? "profit" : "loss",
-        pnlPct: (ht.realized_pnl || 0).toFixed(2),
+        pnlPct: (((ht.current_price - ht.entry_price) / ht.entry_price) * 100).toFixed(2),
+        realizedPnl: (ht.realized_pnl || 0).toFixed(2),
         timestamp: ht.opened_at,
         reasoning: ht.reasoning || "Technical Execution",
       } as Trade);
@@ -322,7 +322,7 @@ export function CandlestickChart({
     // Center on the entryIdx while preserving zoom level (logical range delta)
     const currentDelta = visibleRange.to - visibleRange.from;
     const halfDelta = currentDelta / 2;
-    
+
     // We target placing entryIdx at the center of the current viewport
     timeScale.setVisibleLogicalRange({
       from: activeTrade.entryIdx - halfDelta,
@@ -581,7 +581,7 @@ export function CandlestickChart({
           return (
             <button
               key={trade.id}
-              onClick={() => setFocusedTradeId(focusedTradeId === trade.id ? null : trade.id)}
+              onClick={() => setFocusedTradeId(focusedTradeId === trade.id ? null : String(trade.id))}
               style={{
                 left: x,
                 top: y,

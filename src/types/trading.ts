@@ -1,6 +1,4 @@
-import { z } from "zod";
 export * from "./schemas";
-import type { CandleData, Decision, Position, PnLData, BotConfig } from "./schemas";
 
 export interface BotStatus {
   running: boolean;
@@ -24,6 +22,7 @@ export interface Trade {
   exitPrice?: number;
   result: TradeResult;
   pnlPct?: string;
+  realizedPnl?: string;
   timestamp: string;
   reasoning?: string;
 }

@@ -477,14 +477,14 @@ export function Dashboard() {
         {/* FLOATING GLASS SIDEBAR (Movable) */}
         <div
           onMouseDown={onMouseDown}
-          className={`absolute z-40 transition-shadow ${isDragging ? "shadow-glow cursor-grabbing duration-0" : "duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"} ${sidebarExpanded ? "w-[320px]" : "w-[48px]"}`}
+          className={`absolute z-40 transition-shadow ${isDragging ? "shadow-glow cursor-grabbing duration-0" : "duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"} ${sidebarExpanded ? "h-[600px] w-[320px]" : "h-[48px] w-[48px]"} overflow-hidden rounded-[1rem] border border-white/5 bg-zinc-950/80 backdrop-blur-2xl`}
           style={{
             left: `${sidebarPos.x}px`,
             top: `${sidebarPos.y}px`,
             transitionProperty: isDragging ? "none" : "width, left, top",
           }}
         >
-          <div className="glass-panel drag-handle flex cursor-grab flex-col rounded-2xl p-1 shadow-2xl active:cursor-grabbing">
+          <div className="drag-handle flex h-full p-0.75 cursor-grab flex-col active:cursor-grabbing">
             <Button
               onClick={() => setSidebarExpanded(!sidebarExpanded)}
               variant="ghost"
@@ -529,7 +529,7 @@ export function Dashboard() {
             )}
 
             {sidebarExpanded && (
-              <div className="max-h-[80vh] overflow-x-hidden overflow-y-auto p-1 pt-2">
+              <div className="custom-scrollbar flex-1 overflow-y-auto p-1 pt-2">
                 {activeTab === "live" ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -566,7 +566,7 @@ export function Dashboard() {
         {/* NEURAL WARP OVERLAY */}
         {status === "skipping" && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md transition-all animate-in fade-in zoom-in-95">
-            <div className="relative max-w-sm max-h-48 rounded-[2.5rem] border border-white/5 bg-linear-to-b from-white/5 to-transparent p-12 text-center shadow-2xl">
+            <div className="relative max-h-48 max-w-sm rounded-[2.5rem] border border-white/5 bg-linear-to-b from-white/5 to-transparent p-12 text-center shadow-2xl">
               {/* Glowing Background Glow */}
               <div className="absolute -top-10 -left-10 h-32 w-32 rounded-full bg-emerald-500/10 opacity-50 blur-3xl" />
               <div className="absolute -right-10 -bottom-10 h-16 w-32 rounded-full bg-blue-500/10 opacity-50 blur-3xl" />
@@ -651,7 +651,7 @@ function PositionDetails({
             {trade.side?.toUpperCase()}
           </span>
         </div>
-        <button 
+        <button
           onClick={() => useDashboardStore.getState().triggerJump()}
           className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-zinc-500 transition-all hover:bg-emerald-500/20 hover:text-emerald-400 active:scale-90"
           title="Center Chart"
@@ -730,7 +730,7 @@ function HistoryList({ trades, onAudit }: { trades: any[]; onAudit: (id: string)
             <button
               key={i}
               onClick={() => onAudit(t.id)}
-              className="flex items-center justify-between rounded-lg border border-transparent bg-white/2 px-3 py-2 text-left transition-all hover:border-white/5 hover:bg-white/5"
+              className="flex w-full items-center justify-between rounded-lg border border-transparent bg-white/2 px-3 py-2 text-left transition-all hover:border-white/5 hover:bg-white/5"
             >
               <div className="flex flex-col gap-0.5">
                 <span className="text-[9px] font-bold text-gray-400 italic">
@@ -738,20 +738,25 @@ function HistoryList({ trades, onAudit }: { trades: any[]; onAudit: (id: string)
                 </span>
                 <span className="text-[10px] font-black text-white uppercase">{t.side?.toUpperCase()}</span>
               </div>
-              <div className="flex items-center gap-3 text-right">
-                <span className={`text-[10px] font-black ${t.realized_pnl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                  {t.realized_pnl >= 0 ? "+" : ""}
-                  {t.realized_pnl.toFixed(4)}
-                </span>
-                <button 
-                   onClick={(e) => {
-                     e.stopPropagation();
-                     onAudit(t.id);
-                     useDashboardStore.getState().triggerJump();
-                   }}
-                   className="flex h-6 w-6 items-center justify-center rounded-md border border-white/5 bg-white/2 text-zinc-500 transition-all hover:bg-blue-500/20 hover:text-blue-400 active:scale-90"
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col items-end gap-0.5">
+                  <span
+                    className={`text-[10px] font-black ${t.realized_pnl >= 0 ? "text-emerald-500" : "text-red-500"}`}
+                  >
+                    {t.realized_pnl >= 0 ? "+" : ""}
+                    {(((t.current_price - t.entry_price) / t.entry_price) * 100).toFixed(2)}%
+                  </span>
+                  <span className="text-[9px] font-medium text-zinc-600">${t.realized_pnl.toFixed(2)}</span>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAudit(t.id);
+                    useDashboardStore.getState().triggerJump();
+                  }}
+                  className="flex h-6 w-6 items-center justify-center rounded-md border border-white/5 bg-white/2 text-zinc-500 transition-all hover:bg-blue-500/20 hover:text-blue-400 active:scale-90"
                 >
-                   <LocateFixed size={12} strokeWidth={2.5} />
+                  <LocateFixed size={12} strokeWidth={2.5} />
                 </button>
               </div>
             </button>
