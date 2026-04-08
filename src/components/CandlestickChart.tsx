@@ -197,9 +197,9 @@ export function CandlestickChart({
         slPrice: ht.stop_loss || ht.entry_price * 0.992,
         exitIdx: ht.closed_at ? candleIdx : null,
         exitPrice: ht.current_price,
-        result: ht.realized_pnl >= 0 ? "profit" : "loss",
-        pnlPct: (((ht.current_price - ht.entry_price) / ht.entry_price) * 100).toFixed(2),
-        realizedPnl: (ht.realized_pnl || 0).toFixed(2),
+        result: (ht.realized_pnl || ht.unrealized_pnl) >= 0 ? "profit" : "loss",
+        pnlPct: (ht.pnl_pct !== undefined ? ht.pnl_pct : 0).toFixed(2),
+        realizedPnl: (ht.realized_pnl || ht.unrealized_pnl || 0).toFixed(2),
         timestamp: ht.opened_at,
         reasoning: ht.reasoning || "Technical Execution",
       } as Trade);
@@ -510,7 +510,7 @@ export function CandlestickChart({
           lineWidth: 2,
           lineStyle: LineStyle.Dotted,
           axisLabelVisible: true,
-          title: trade.result === "profit" ? `REALIZED EXIT (+${trade.pnlPct}%)` : `REALIZED EXIT (${trade.pnlPct}%)`,
+          title: trade.result === "profit" ? `EXIT (+${trade.pnlPct}%)` : `EXIT (${trade.pnlPct}%)`,
         })
       );
     }

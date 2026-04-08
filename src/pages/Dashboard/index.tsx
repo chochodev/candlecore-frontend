@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -93,15 +93,22 @@ export function Dashboard() {
     });
   };
 
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => {
+  const onMouseMove = useCallback(
+    (e: MouseEvent) => {
       if (!isDragging) return;
-      setSidebarPos({
-        x: e.clientX - dragOffset.x,
-        y: e.clientY - dragOffset.y,
-      });
-    };
 
+      const sidebarWidth = sidebarExpanded ? 320 : 48;
+      const sidebarHeight = sidebarExpanded ? 600 : 48;
+
+      const newX = Math.max(0, Math.min(e.clientX - dragOffset.x, window.innerWidth - sidebarWidth));
+      const newY = Math.max(0, Math.min(e.clientY - dragOffset.y, window.innerHeight - sidebarHeight));
+
+      setSidebarPos({ x: newX, y: newY });
+    },
+    [isDragging, dragOffset, sidebarExpanded, setSidebarPos]
+  );
+
+  useEffect(() => {
     const onMouseUp = () => setIsDragging(false);
 
     if (isDragging) {
@@ -112,7 +119,7 @@ export function Dashboard() {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     };
-  }, [isDragging, dragOffset]);
+  }, [isDragging, onMouseMove, setIsDragging]);
 
   const pnlStats = {
     pnl: pnl?.total_pnl || 0,
@@ -727,9 +734,8 @@ function HistoryList({ trades, onAudit }: { trades: any[]; onAudit: (id: string)
           .slice()
           .reverse()
           .map((t, i) => (
-            <button
+            <div
               key={i}
-              onClick={() => onAudit(t.id)}
               className="flex w-full items-center justify-between rounded-lg border border-transparent bg-white/2 px-3 py-2 text-left transition-all hover:border-white/5 hover:bg-white/5"
             >
               <div className="flex flex-col gap-0.5">
@@ -744,7 +750,7 @@ function HistoryList({ trades, onAudit }: { trades: any[]; onAudit: (id: string)
                     className={`text-[10px] font-black ${t.realized_pnl >= 0 ? "text-emerald-500" : "text-red-500"}`}
                   >
                     {t.realized_pnl >= 0 ? "+" : ""}
-                    {(((t.current_price - t.entry_price) / t.entry_price) * 100).toFixed(2)}%
+                    {(t.pnl_pct || 0).toFixed(2)}%
                   </span>
                   <span className="text-[9px] font-medium text-zinc-600">${t.realized_pnl.toFixed(2)}</span>
                 </div>
@@ -759,7 +765,7 @@ function HistoryList({ trades, onAudit }: { trades: any[]; onAudit: (id: string)
                   <LocateFixed size={12} strokeWidth={2.5} />
                 </button>
               </div>
-            </button>
+            </div>
           ))
       )}
     </div>
