@@ -98,18 +98,17 @@ function TradeInfoPanel({ trade }: { trade: Trade | null }) {
       <div className="flex flex-col items-end gap-2 text-right">
         {shieldStatus}
         <div className={`flex flex-col`}>
-            <span className={`text-[12px] font-black tracking-tighter ${dirColor}`}>
-                {trade.result === "open" ? "RUNNING" : trade.result === "profit" ? "PROFIT" : "RECOVERY"}
+          <span className={`text-[12px] font-black tracking-tighter ${dirColor}`}>
+            {trade.result === "open" ? "RUNNING" : trade.result === "profit" ? "PROFIT" : "RECOVERY"}
+          </span>
+          <div className="flex items-center justify-end gap-2 font-mono text-[9px] font-bold">
+            <span className={trade.result === "profit" ? "text-emerald-500" : "text-red-500"}>
+              {trade.result === "profit" ? "+" : ""}
+              {trade.pnlPct}%
             </span>
-            <div className="flex items-center justify-end gap-2 font-mono text-[9px] font-bold">
-                <span className={trade.result === "profit" ? "text-emerald-500" : "text-red-500"}>
-                    {trade.result === "profit" ? "+" : ""}{trade.pnlPct}%
-                </span>
-                <span className="text-zinc-600">/</span>
-                <span className="text-zinc-400">
-                    ${trade.realizedPnl || "0.00"}
-                </span>
-            </div>
+            <span className="text-zinc-600">/</span>
+            <span className="text-zinc-400">${trade.realizedPnl || "0.00"}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -121,7 +120,7 @@ function TradeInfoPanel({ trade }: { trade: Trade | null }) {
 interface CandlestickChartProps {
   candles: CandleData[];
   decisions: Decision[];
-  historicalTrades: any[];
+  historicalTrades: Position[];
   activeSymbol?: string;
   timeframe?: string;
   isSearching?: boolean;
@@ -169,7 +168,7 @@ export function CandlestickChart({
     const result: Trade[] = [];
 
     // ── Build Trades from Historical Source (The Stable Source) ──
-    historicalTrades.forEach((ht) => {
+    historicalTrades.forEach((ht: Position) => {
       const entryTimeMs = new Date(ht.opened_at).getTime();
       const entryTimeSec = Math.floor(entryTimeMs / 1000);
 
@@ -224,13 +223,16 @@ export function CandlestickChart({
       const candle = sortedCandles[sortedIdx];
       const anchorTime = Math.floor(new Date(candle.timestamp).getTime() / 1000);
 
-      if (d.signal === "buy") {
+      const rawSignal = d.signal.toLowerCase();
+      const isEnter = rawSignal === "buy" || rawSignal === "long" || rawSignal === "sell" || rawSignal === "short";
+      
+      if (isEnter) {
         result.push({
           id: `signal-${idx}`,
           entryIdx: candles.indexOf(candle),
           entryTime: entryTimeSec,
           visualAnchorTime: anchorTime,
-          dir: "buy",
+          dir: (rawSignal === "buy" || rawSignal === "long") ? "buy" : "sell",
           entryPrice: d.price,
           tpPrice: d.take_profit || d.price * 1.018,
           slPrice: d.stop_loss || d.price * 0.992,
@@ -615,29 +617,25 @@ export function CandlestickChart({
 
         {/* Empty state */}
         {candles.length === 0 && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-dark-core/80 backdrop-blur-xl">
-            <div className="relative max-w-sm rounded-3xl border border-white/5 bg-linear-to-b from-white/2 to-transparent p-10 text-center shadow-2xl">
-              <div className="relative mx-auto mb-8 flex h-18 w-18 items-center justify-center rounded-[2rem] bg-emerald-500/10 shadow-[0_0_80px_-15px_rgba(16,185,129,0.4)]">
-                <div className="absolute inset-0 animate-pulse rounded-[2rem] border border-emerald-500/20" />
-                <svg
-                  className={`h-8 w-8 text-emerald-500 ${isSearching ? "animate-spin" : "animate-pulse"}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <p className="mb-4 text-[11px] font-black tracking-[.3em] text-zinc-500 uppercase">
-                Simulation Engine v1.3.1
-              </p>
-              <p className="text-[11px] leading-relaxed font-medium text-zinc-400 uppercase">
-                Ready for{" "}
-                <span className="font-black text-white">
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 animate-in fade-in">
+            <div className="flex flex-col items-center gap-5">
+              <svg
+                className={`h-5 w-5 text-emerald-500 ${isSearching ? "animate-spin" : "animate-pulse"}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <div className="text-center">
+                <p className="font-mono text-[13px] text-white">Ready to stream</p>
+                <p className="font-mono text-[11px] text-gray-600">
                   {activeSymbol.toUpperCase()} / {timeframe}
-                </span>{" "}
-                stream
-              </p>
+                </p>
+              </div>
             </div>
           </div>
         )}

@@ -12,19 +12,19 @@ export const CandleSchema = z.object({
   close: z.number(),
   volume: z.number(),
   indicators: z.record(z.string(), z.number()).optional(),
-});
+}).passthrough();
 
 export const DecisionSchema = z.object({
   symbol: z.string(),
   price: z.number(),
-  signal: z.enum(["buy", "sell", "hold"]),
+  signal: z.enum(["buy", "sell", "hold", "long", "short"]),
   reasoning: z.string(),
   timestamp: z.string(),
   indicators: z.record(z.string(), z.number()).optional(),
   stop_loss: z.number().optional(),
   take_profit: z.number().optional(),
   trailing_sl: z.number().optional(),
-});
+}).passthrough();
 
 export const PositionSchema = z.object({
   id: z.string(),
@@ -35,19 +35,21 @@ export const PositionSchema = z.object({
   current_price: z.number(),
   unrealized_pnl: z.number(),
   realized_pnl: z.number().default(0),
+  pnl_pct: z.number().optional().default(0),
   opened_at: z.string(),
   closed_at: z.string().optional().nullable(),
   stop_loss: z.number(),
   take_profit: z.number(),
   trailing_sl: z.number().optional().nullable(),
-});
+  reasoning: z.string().optional(),
+}).passthrough();
 
 export const PnLSchema = z.object({
   balance: z.number(),
   total_pnl: z.number(),
   win_rate: z.number(),
   trades: z.array(PositionSchema).optional().default([]),
-});
+}).passthrough();
 
 export const BotConfigSchema = z.object({
   symbol: z.string(),
@@ -57,7 +59,7 @@ export const BotConfigSchema = z.object({
   dry_run: z.boolean(),
   replay_speed: z.number(),
   strategy_params: z.record(z.string(), z.any()).optional(),
-});
+}).passthrough();
 
 // ── Unified Inference ──
 
